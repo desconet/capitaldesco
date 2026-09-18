@@ -1,4 +1,5 @@
-import { createFileRoute, useServerFn } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { Building2, Calculator, CheckCircle2, FileDown, Info, Loader2, Plus, RefreshCw, School, Trash2 } from "lucide-react";
 
@@ -216,6 +217,6 @@ function Index() {
   );
 }
 
-function Field({ label, children }: { label?: string; children: React.ReactNode }) { return <label className="block">{label && <span className="mb-1.5 block text-xs font-semibold text-ink/65">{label}</span>}{children}</label>; }
+function Field({ label, children }: { label: string | undefined; children: React.ReactNode }) { return <label className="block">{label && <span className="mb-1.5 block text-xs font-semibold text-ink/65">{label}</span>}{children}</label>; }
 function SectionTitle({ numero, titulo, children }: { numero: string; titulo: string; children?: React.ReactNode }) { return <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-2"><span className="grid size-6 place-items-center rounded-md bg-brand/10 text-xs font-bold text-brand">{numero}</span><h2 className="font-display text-sm font-bold uppercase">{titulo}</h2></div>{children}</div>; }
 function Stat({ label, valor }: { label: string; valor: number }) { return <div><p className="text-[11px] text-primary-foreground/60">{label}</p><p className="font-display text-lg font-bold">{numeroFmt(valor).replace(",00", "")}</p></div>; }
