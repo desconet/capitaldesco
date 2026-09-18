@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Building2, Calculator, CheckCircle2, FileDown, Info, Loader2, Plus, RefreshCw, School, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import pdfFontUrl from "@/assets/DejaVuSans.ttf?url";
 import {
   ANO_REFERENCIA,
   brl,
@@ -114,13 +115,22 @@ function Index() {
       const [{ jsPDF }, autoTableModule] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
       const autoTable = autoTableModule.default;
       const doc = new jsPDF();
+      const fonte = await fetch(pdfFontUrl).then((r) => r.arrayBuffer());
+      let binario = "";
+      const bytes = new Uint8Array(fonte);
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      }
+      doc.addFileToVFS("DejaVuSans.ttf", btoa(binario));
+      doc.addFont("DejaVuSans.ttf", "DejaVuSans", "normal");
+      doc.setFont("DejaVuSans");
       doc.setFillColor(28, 75, 145); doc.rect(0, 0, 210, 34, "F");
-      doc.setTextColor(255, 255, 255); doc.setFontSize(18); doc.text("Relatorio de Simulacao FNDE", 14, 16);
+      doc.setTextColor(255, 255, 255); doc.setFontSize(18); doc.text("Relatório de Simulação FNDE", 14, 16);
       doc.setFontSize(10); doc.text(modo === "turmas" ? "Novas Turmas" : "Novos Estabelecimentos", 14, 25);
       doc.setTextColor(25, 34, 53); doc.setFontSize(11);
-      doc.text(`Municipio: ${municipio} / ${uf || "--"}`, 14, 45);
-      doc.text(`Inicio de funcionamento: ${diaInicio}/${String(mesIndex + 1).padStart(2, "0")}/${ANO_REFERENCIA}`, 14, 52);
-      doc.text(`Meses no exercicio: ${meses}`, 14, 59);
+      doc.text(`Município: ${municipio} / ${uf || "--"}`, 14, 45);
+      doc.text(`Início de funcionamento: ${diaInicio}/${String(mesIndex + 1).padStart(2, "0")}/${ANO_REFERENCIA}`, 14, 52);
+      doc.text(`Meses no exercício: ${meses}`, 14, 59);
       doc.text(`VAAF base: ${brl(vaaf)}`, 110, 45);
       doc.text(`Fonte: ${fonteVaaf}`, 110, 52, { maxWidth: 86 });
       const linhas = resultados.map((r) => [
@@ -133,12 +143,13 @@ function Index() {
         head: [["Etapa / Turno", "Modalidade", "Fator", "Alunos", "Valor anual", "Repasse"]],
         body: linhas,
         foot: [["TOTAL", "", "", String(totalAlunos), brl(totalAnual), brl(totalRepasse)]],
-        styles: { fontSize: 8, cellPadding: 2.5 },
+        styles: { font: "DejaVuSans", fontSize: 8, cellPadding: 2.5 },
         headStyles: { fillColor: [28, 75, 145] }, footStyles: { fillColor: [230, 238, 249], textColor: [25, 34, 53], fontStyle: "bold" },
       });
       const finalY = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 100;
       doc.setFontSize(9); doc.setTextColor(90, 99, 116);
-      doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")} · Valores estimativos sujeitos a validacao pelo FNDE.`, 14, finalY + 12);
+      doc.setFont("DejaVuSans");
+      doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")} · Valores estimativos sujeitos à validação pelo FNDE.`, 14, finalY + 12);
       doc.save(`simulacao-fnde-${municipio.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.pdf`);
     } finally { setExportando(false); }
   }
