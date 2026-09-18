@@ -36,9 +36,19 @@ export function calcularFator(etapa: Etapa, turno: Turno, modalidade: Modalidade
 /** Prazo máximo de pagamento dos programas: 18 meses. */
 export const MESES_MAXIMOS_REPASSE = 18;
 
-/** O mês identifica o início cadastrado; o programa projeta até 18 meses de repasse. */
-export function mesesDeFuncionamento(_mesIndex: number): number {
-  return MESES_MAXIMOS_REPASSE;
+/** Calcula os meses restantes, descontando os meses entre o início e o cadastro. */
+export function mesesDeFuncionamento(dataInicio: string, dataCadastro: string): number {
+  const inicio = dataInicio.split("-").map(Number);
+  const cadastro = dataCadastro.split("-").map(Number);
+  if (inicio.length !== 3 || cadastro.length !== 3 || inicio.some(Number.isNaN) || cadastro.some(Number.isNaN)) return 0;
+  const [anoInicio, mesInicio, diaInicio] = inicio;
+  const [anoCadastro, mesCadastro, diaCadastro] = cadastro;
+  if (!anoInicio || !mesInicio || !diaInicio || !anoCadastro || !mesCadastro || !diaCadastro) return 0;
+  const inicioUtc = Date.UTC(anoInicio, mesInicio - 1, diaInicio);
+  const cadastroUtc = Date.UTC(anoCadastro, mesCadastro - 1, diaCadastro);
+  if (inicioUtc > cadastroUtc) return 0;
+  const mesesDecorridos = (anoCadastro - anoInicio) * 12 + (mesCadastro - mesInicio);
+  return Math.max(0, Math.min(MESES_MAXIMOS_REPASSE, MESES_MAXIMOS_REPASSE - mesesDecorridos));
 }
 
 export function calcularRepasse(

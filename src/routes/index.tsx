@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { consultarEscolaPorInep, type EscolaInep } from "@/lib/escola.functions";
 import {
   ANO_REFERENCIA, brl, calcularFator, calcularRepasse, COMBINACOES, type Etapa,
-  fatorFmt, MESES, MESES_MAXIMOS_REPASSE, mesesDeFuncionamento, type Modalidade, numeroFmt, type Turno, VAAF_NACIONAL_2026,
+  fatorFmt, MESES_MAXIMOS_REPASSE, mesesDeFuncionamento, type Modalidade, numeroFmt, type Turno, VAAF_NACIONAL_2026,
 } from "@/lib/fnde";
 import { buscarMunicipios, buscarUfs, type Municipio, type Uf } from "@/lib/ibge";
 import { obterParametrosFundeb } from "@/lib/vaaf.functions";
@@ -28,14 +28,14 @@ export const Route = createFileRoute("/")({
 });
 
 type Modo = "turmas" | "estabelecimentos";
-interface Turma { id: number; etapa: Etapa; turno: Turno; mesIndex: number | null; regular: boolean; especial: boolean; alunosRegulares: number; alunosEspeciais: number }
+interface Turma { id: number; etapa: Etapa; turno: Turno; dataInicio: string; regular: boolean; especial: boolean; alunosRegulares: number; alunosEspeciais: number }
 type Quantidades = Record<string, number>;
 type Resultado = { chave: string; etapa: Etapa; turno: Turno; modalidade: Modalidade; fator: number; alunos: number; meses: number; valorAnual: number; repasse: number };
 
 const campo = "w-full rounded-md border border-ink/10 bg-background px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15 disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink/35";
 const campoErro = "border-destructive/60 focus:border-destructive focus:ring-destructive/15";
 const quantidadesIniciais = Object.fromEntries(COMBINACOES.map((c) => [c.chave, 0]));
-const novaTurma = (id: number): Turma => ({ id, etapa: "Creche", turno: "Integral", mesIndex: null, regular: true, especial: false, alunosRegulares: 0, alunosEspeciais: 0 });
+const novaTurma = (id: number): Turma => ({ id, etapa: "Creche", turno: "Integral", dataInicio: "", regular: true, especial: false, alunosRegulares: 0, alunosEspeciais: 0 });
 
 function Index() {
   const [modo, setModo] = useState<Modo>("turmas");
@@ -47,8 +47,8 @@ function Index() {
   const [vaaf, setVaaf] = useState(VAAF_NACIONAL_2026);
   const [fonteVaaf, setFonteVaaf] = useState("Valor oficial 2026 embutido");
   const [carregandoVaaf, setCarregandoVaaf] = useState(false);
-  const [mesIndex, setMesIndex] = useState<number | null>(null);
-  const [diaInicio, setDiaInicio] = useState("01");
+  const [dataCadastro, setDataCadastro] = useState("");
+  const [dataInicioEstabelecimento, setDataInicioEstabelecimento] = useState("");
   const [turmas, setTurmas] = useState<Turma[]>([novaTurma(1)]);
   const [nextId, setNextId] = useState(2);
   const [quantidades, setQuantidades] = useState<Quantidades>(quantidadesIniciais);
@@ -60,6 +60,7 @@ function Index() {
   const obterParametros = useServerFn(obterParametrosFundeb);
   const consultarEscola = useServerFn(consultarEscolaPorInep);
 
+  useEffect(() => { setDataCadastro(new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })); }, []);
   useEffect(() => { buscarUfs().then(setUfs).catch(() => setUfs([])).finally(() => setCarregandoLocalidades(false)); }, []);
   useEffect(() => {
     if (!uf) { setMunicipios([]); setMunicipioId(""); return; }
@@ -95,38 +96,62 @@ function Index() {
 
   const municipio = municipios.find((m) => String(m.id) === municipioId)?.nome ?? "Não selecionado";
   const vaafValido = Number.isFinite(vaaf) && vaaf > 0;
-  const errosGerais = [!uf ? "Selecione o estado." : "", !municipioId ? "Selecione o município." : "", !vaafValido ? "Informe um VAAF maior que zero." : ""].filter(Boolean);
+  const dataCadastroValida = /^\d{4}-\d{2}-\d{2}$/.test(dataCadastro);
+  const dataPosteriorAoCadastro = (inicio: string) => Boolean(inicio && dataCadastroValida && inicio > dataCadastro);
+  const errosGerais = [!uf ? "Selecione o estado." : "", !municipioId ? "Selecione o município." : "", !dataCadastroValida ? "Informe a data de cadastro." : "", !vaafValido ? "Informe um VAAF maior que zero." : ""].filter(Boolean);
   const errosTurmas = turmas.flatMap((t, i) => {
     const erros: string[] = [];
-    if (t.mesIndex === null) erros.push(`Turma ${i + 1}: selecione o mês de início.`);
-    if (!t.regular && !t.especial) erros.push(`Turma ${i + 1}: marque Regular e/ou Especial.`);
+    if (!t.dataInicio) erros.push(`Turma ${i + 1}: informe a data de início.`);
+    else if (dataPosteriorAoCadastro(t.dataInicio)) erros.push(`Turma ${i + 1}: a data de início não pode ser posterior ao cadastro.`);
+    else if (dataCadastroValida && mesesDeFuncionamento(t.dataInicio, dataCadastro) <= 0) erros.push(`Turma ${i + 1}: o prazo máximo de 18 meses já terminou.`);
+    if (!t.regular) erros.push(`Turma ${i + 1}: marque Regular, pois os alunos especiais fazem parte do total regular.`);
     if (t.regular && t.alunosRegulares <= 0) erros.push(`Turma ${i + 1}: informe a quantidade de alunos regulares.`);
     if (t.especial && t.alunosEspeciais <= 0) erros.push(`Turma ${i + 1}: informe a quantidade de alunos especiais.`);
+    if (t.especial && t.alunosEspeciais > t.alunosRegulares) erros.push(`Turma ${i + 1}: alunos especiais não podem superar o total de alunos regulares.`);
     return erros;
   });
-  const errosEstabelecimento = [mesIndex === null ? "Selecione o mês de início do estabelecimento." : "", !/^\d{8}$/.test(inep) ? "Informe um código INEP com 8 números." : "", !escola ? "Consulte e confirme a escola pelo código INEP." : "", Object.values(quantidades).every((q) => q <= 0) ? "Informe ao menos uma matrícula não beneficiária." : ""].filter(Boolean);
+  const paresEstabelecimento = COMBINACOES.filter((c) => c.modalidade === "Regular").map((regular) => ({ regular, especial: COMBINACOES.find((c) => c.modalidade === "Educação Especial" && c.etapa === regular.etapa && c.turno === regular.turno) }));
+  const errosQuantidadesEstabelecimento = paresEstabelecimento.flatMap(({ regular, especial }) => {
+    const total = quantidades[regular.chave] ?? 0;
+    const especiais = especial ? quantidades[especial.chave] ?? 0 : 0;
+    return especiais > total ? [`${regular.etapa} ${regular.turno}: alunos especiais não podem superar o total regular.`] : [];
+  });
+  const errosEstabelecimento = [!dataInicioEstabelecimento ? "Informe a data de início do estabelecimento." : "", dataPosteriorAoCadastro(dataInicioEstabelecimento) ? "A data de início do estabelecimento não pode ser posterior ao cadastro." : "", dataInicioEstabelecimento && dataCadastroValida && !dataPosteriorAoCadastro(dataInicioEstabelecimento) && mesesDeFuncionamento(dataInicioEstabelecimento, dataCadastro) <= 0 ? "O prazo máximo de 18 meses do estabelecimento já terminou." : "", !/^\d{8}$/.test(inep) ? "Informe um código INEP com 8 números." : "", !escola ? "Consulte e confirme a escola pelo código INEP." : "", paresEstabelecimento.every(({ regular }) => (quantidades[regular.chave] ?? 0) <= 0) ? "Informe ao menos uma matrícula regular." : "", ...errosQuantidadesEstabelecimento].filter(Boolean);
   const avisos = [...errosGerais, ...(modo === "turmas" ? errosTurmas : errosEstabelecimento)];
   const dadosValidos = avisos.length === 0;
 
   const resultadosTurmas = useMemo<Resultado[]>(() => turmas.flatMap((t) => {
-    if (t.mesIndex === null) return [];
-    const meses = mesesDeFuncionamento(t.mesIndex);
+    if (!t.dataInicio || !dataCadastroValida || dataPosteriorAoCadastro(t.dataInicio)) return [];
+    const meses = mesesDeFuncionamento(t.dataInicio, dataCadastro);
     const categorias: Resultado[] = [];
-    if (t.regular && t.alunosRegulares > 0) {
+    const alunosEspeciais = t.especial ? Math.min(t.alunosEspeciais, t.alunosRegulares) : 0;
+    const alunosSemEspecial = Math.max(0, t.alunosRegulares - alunosEspeciais);
+    if (t.regular && alunosSemEspecial > 0) {
       const modalidade: Modalidade = "Regular"; const fator = calcularFator(t.etapa, t.turno, modalidade);
-      categorias.push({ chave: `${t.id}-regular`, etapa: t.etapa, turno: t.turno, modalidade, fator, alunos: t.alunosRegulares, meses, ...calcularRepasse(vaaf, fator, t.alunosRegulares, meses) });
+      categorias.push({ chave: `${t.id}-regular`, etapa: t.etapa, turno: t.turno, modalidade, fator, alunos: alunosSemEspecial, meses, ...calcularRepasse(vaaf, fator, alunosSemEspecial, meses) });
     }
-    if (t.especial && t.alunosEspeciais > 0) {
+    if (t.especial && alunosEspeciais > 0) {
       const modalidade: Modalidade = "Educação Especial"; const fator = calcularFator(t.etapa, t.turno, modalidade);
-      categorias.push({ chave: `${t.id}-especial`, etapa: t.etapa, turno: t.turno, modalidade, fator, alunos: t.alunosEspeciais, meses, ...calcularRepasse(vaaf, fator, t.alunosEspeciais, meses) });
+      categorias.push({ chave: `${t.id}-especial`, etapa: t.etapa, turno: t.turno, modalidade, fator, alunos: alunosEspeciais, meses, ...calcularRepasse(vaaf, fator, alunosEspeciais, meses) });
     }
     return categorias;
-  }), [turmas, vaaf]);
-  const mesesEstabelecimento = mesIndex === null ? 0 : mesesDeFuncionamento(mesIndex);
-  const resultadosEstabelecimento = useMemo<Resultado[]>(() => COMBINACOES.map((c) => {
-    const fator = calcularFator(c.etapa, c.turno, c.modalidade); const alunos = quantidades[c.chave] ?? 0;
-    return { chave: c.chave, etapa: c.etapa, turno: c.turno, modalidade: c.modalidade, fator, alunos, meses: mesesEstabelecimento, ...calcularRepasse(vaaf, fator, alunos, mesesEstabelecimento) };
-  }).filter((r) => r.alunos > 0), [quantidades, vaaf, mesesEstabelecimento]);
+  }), [turmas, vaaf, dataCadastro, dataCadastroValida]);
+  const mesesEstabelecimento = dataInicioEstabelecimento && dataCadastroValida && !dataPosteriorAoCadastro(dataInicioEstabelecimento) ? mesesDeFuncionamento(dataInicioEstabelecimento, dataCadastro) : 0;
+  const resultadosEstabelecimento = useMemo<Resultado[]>(() => paresEstabelecimento.flatMap(({ regular, especial }) => {
+    const total = quantidades[regular.chave] ?? 0;
+    const alunosEspeciais = especial ? Math.min(quantidades[especial.chave] ?? 0, total) : 0;
+    const alunosSemEspecial = Math.max(0, total - alunosEspeciais);
+    const linhas: Resultado[] = [];
+    if (alunosSemEspecial > 0) {
+      const fator = calcularFator(regular.etapa, regular.turno, regular.modalidade);
+      linhas.push({ chave: regular.chave, etapa: regular.etapa, turno: regular.turno, modalidade: regular.modalidade, fator, alunos: alunosSemEspecial, meses: mesesEstabelecimento, ...calcularRepasse(vaaf, fator, alunosSemEspecial, mesesEstabelecimento) });
+    }
+    if (especial && alunosEspeciais > 0) {
+      const fator = calcularFator(especial.etapa, especial.turno, especial.modalidade);
+      linhas.push({ chave: especial.chave, etapa: especial.etapa, turno: especial.turno, modalidade: especial.modalidade, fator, alunos: alunosEspeciais, meses: mesesEstabelecimento, ...calcularRepasse(vaaf, fator, alunosEspeciais, mesesEstabelecimento) });
+    }
+    return linhas;
+  }), [quantidades, vaaf, mesesEstabelecimento]);
   const resultados = dadosValidos ? (modo === "turmas" ? resultadosTurmas : resultadosEstabelecimento) : [];
   const totalAlunos = resultados.reduce((s, r) => s + r.alunos, 0);
   const totalAnual = resultados.reduce((s, r) => s + r.valorAnual, 0);
@@ -149,7 +174,9 @@ function Index() {
       doc.setFontSize(10); doc.text(modo === "turmas" ? "Novas Turmas" : "Novos Estabelecimentos", 14, 25); doc.setTextColor(25, 34, 53); doc.setFontSize(10);
       doc.text(`Município: ${municipio} / ${uf}`, 14, 44); doc.text(`VAAF base: ${brl(vaaf)}`, 14, 51); doc.text(`Fonte: ${fonteVaaf}`, 14, 58, { maxWidth: 182 });
       let inicioTabela = 68;
-       if (modo === "estabelecimentos" && escola && mesIndex !== null) { doc.text(`Escola: ${escola.nome} · INEP ${inep}`, 14, 65, { maxWidth: 182 }); doc.text(`Início: ${diaInicio}/${String(mesIndex + 1).padStart(2, "0")}/${ANO_REFERENCIA} · Prazo do repasse: ${MESES_MAXIMOS_REPASSE} meses`, 14, 72); inicioTabela = 80; }
+       doc.text(`Data de cadastro: ${formatarData(dataCadastro)}`, 14, 65);
+       inicioTabela = 74;
+       if (modo === "estabelecimentos" && escola) { doc.text(`Escola: ${escola.nome} · INEP ${inep}`, 14, 72, { maxWidth: 182 }); doc.text(`Início: ${formatarData(dataInicioEstabelecimento)} · Meses restantes: ${mesesEstabelecimento}`, 14, 79); inicioTabela = 87; }
       const linhas = resultados.map((r) => [`${r.etapa} / ${r.turno}`, r.modalidade === "Educação Especial" ? "Especial" : "Regular", String(r.meses), fatorFmt(r.fator), String(r.alunos), brl(r.valorAnual), brl(r.repasse)]);
       autoTableModule.default(doc, { startY: inicioTabela, head: [["Etapa / Turno", "Modalidade", "Meses", "Fator", "Alunos", "Valor anual", "Repasse"]], body: linhas, foot: [["TOTAL", "", "", "", String(totalAlunos), brl(totalAnual), brl(totalRepasse)]], styles: { font: "DejaVuSans", fontSize: 7.5, cellPadding: 2.2 }, headStyles: { fillColor: [28, 75, 145] }, footStyles: { fillColor: [230, 238, 249], textColor: [25, 34, 53], fontStyle: "bold" } });
       const finalY = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 100; doc.setFontSize(8); doc.setTextColor(90, 99, 116); doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")} · Valores estimativos sujeitos à validação pelo FNDE.`, 14, finalY + 10);
@@ -161,33 +188,34 @@ function Index() {
     <header className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="grid size-11 place-items-center rounded-md bg-brand font-display font-bold text-primary-foreground shadow-sm">FDE</div><div><h1 className="font-display text-lg font-bold">Calculadora de Repasse FNDE</h1><p className="text-xs text-ink/55">Novas Turmas e Novos Estabelecimentos</p></div></div><div className="flex items-center gap-2"><span className="hidden rounded-full border border-special/25 bg-background/80 px-3 py-2 text-xs font-semibold text-special sm:inline">FUNDEB · {ANO_REFERENCIA}</span><Button onClick={exportarPdf} disabled={exportando || !dadosValidos || resultados.length === 0} className="bg-brand text-primary-foreground hover:bg-brand-deep">{exportando ? <Loader2 className="animate-spin" /> : <FileDown />} Exportar PDF</Button></div></header>
     <nav className="mt-7 grid max-w-xl grid-cols-1 rounded-lg border border-ink/10 bg-background/75 p-1 shadow-sm sm:grid-cols-2" aria-label="Tipo de cálculo"><Button variant="ghost" onClick={() => setModo("turmas")} className={modo === "turmas" ? "bg-brand text-primary-foreground hover:bg-brand hover:text-primary-foreground" : "text-ink/60"}><School /> Novas Turmas</Button><Button variant="ghost" onClick={() => setModo("estabelecimentos")} className={modo === "estabelecimentos" ? "bg-brand text-primary-foreground hover:bg-brand hover:text-primary-foreground" : "text-ink/60"}><Building2 /> Novos Estabelecimentos</Button></nav>
 
-    <section className="mt-5 border-y border-ink/8 bg-background/75 px-4 py-5 shadow-sm sm:px-6"><SectionTitle numero="1" titulo="Localidade e valor de referência" /><div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <section className="mt-5 border-y border-ink/8 bg-background/75 px-4 py-5 shadow-sm sm:px-6"><SectionTitle numero="1" titulo="Localidade, cadastro e valor de referência" /><div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Field label="Estado (UF)" required><select aria-invalid={!uf} className={`${campo} ${!uf ? campoErro : ""}`} value={uf} onChange={(e) => setUf(e.target.value)}><option value="">Selecione</option>{ufs.map((u) => <option key={u.id} value={u.sigla}>{u.nome}</option>)}</select></Field>
       <Field label="Município" required><select aria-invalid={!municipioId} className={`${campo} ${!municipioId ? campoErro : ""}`} value={municipioId} onChange={(e) => setMunicipioId(e.target.value)} disabled={!uf || carregandoLocalidades}><option value="">{carregandoLocalidades && uf ? "Carregando..." : "Selecione"}</option>{municipios.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}</select></Field>
+      <Field label="Data de cadastro" required><input aria-invalid={!dataCadastroValida} className={`${campo} ${!dataCadastroValida ? campoErro : ""}`} type="date" value={dataCadastro} onChange={(e) => setDataCadastro(e.target.value)} /></Field>
       <Field label="VAAF Base do FUNDEB (R$)" required><div className="flex gap-2"><input aria-invalid={!vaafValido} className={`${campo} ${!vaafValido ? campoErro : ""}`} type="number" min="0.01" step="0.01" value={vaaf || ""} onChange={(e) => setVaaf(Number(e.target.value))} /><Button variant="outline" size="icon" onClick={atualizarVaaf} disabled={!municipioId || carregandoVaaf} title="Atualizar valor oficial">{carregandoVaaf ? <Loader2 className="animate-spin" /> : <RefreshCw />}</Button></div></Field>
     </div><p className="mt-3 flex gap-2 text-[11px] leading-relaxed text-ink/50"><Info className="mt-0.5 size-3.5 shrink-0" />{municipioId ? fonteVaaf : "Selecione o município para consultar automaticamente o valor oficial."}</p></section>
 
     {modo === "turmas" ? <section className="mt-5 bg-background p-5 shadow-sm ring-1 ring-ink/5 sm:p-6"><SectionTitle numero="2" titulo="Matrículas aprovadas"><Button size="sm" onClick={() => { setTurmas((v) => [...v, novaTurma(nextId)]); setNextId((v) => v + 1); }} className="bg-brand text-primary-foreground hover:bg-brand-deep"><Plus /> Nova turma</Button></SectionTitle><div className="mt-5 space-y-4">{turmas.map((t, i) => <article key={t.id} className="border-b border-ink/10 pb-5 last:border-0 last:pb-0"><div className="mb-3 flex items-center justify-between"><h3 className="font-display text-sm font-bold">Turma {i + 1}</h3><Button variant="ghost" size="icon" onClick={() => setTurmas((v) => v.filter((x) => x.id !== t.id))} disabled={turmas.length === 1} className="text-destructive" title="Remover turma"><Trash2 /></Button></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <Field label="Etapa" required><select className={campo} value={t.etapa} onChange={(e) => atualizarTurma(t.id, "etapa", e.target.value as Etapa)}><option>Creche</option><option>Pré-escola</option></select></Field>
       <Field label="Turno" required><select className={campo} value={t.turno} onChange={(e) => atualizarTurma(t.id, "turno", e.target.value as Turno)}><option>Integral</option><option>Parcial</option></select></Field>
-       <Field label="Mês de início" required><select aria-invalid={t.mesIndex === null} className={`${campo} ${t.mesIndex === null ? campoErro : ""}`} value={t.mesIndex ?? ""} onChange={(e) => atualizarTurma(t.id, "mesIndex", e.target.value === "" ? null : Number(e.target.value))}><option value="">Selecione</option>{MESES.map((m, index) => <option key={m} value={index}>{m}</option>)}</select></Field>
-    </div><div className="mt-4 grid gap-3 sm:grid-cols-2"><ModalidadeTurma label="Regular" checked={t.regular} alunos={t.alunosRegulares} erro={t.regular && t.alunosRegulares <= 0} onChecked={(v) => alternarModalidade(t.id, "regular", v)} onAlunos={(v) => atualizarTurma(t.id, "alunosRegulares", v)} /><ModalidadeTurma label="Especial" checked={t.especial} alunos={t.alunosEspeciais} erro={t.especial && t.alunosEspeciais <= 0} onChecked={(v) => alternarModalidade(t.id, "especial", v)} onAlunos={(v) => atualizarTurma(t.id, "alunosEspeciais", v)} /></div></article>)}</div></section> :
+       <Field label="Data de início" required><input aria-invalid={!t.dataInicio || dataPosteriorAoCadastro(t.dataInicio)} className={`${campo} ${!t.dataInicio || dataPosteriorAoCadastro(t.dataInicio) ? campoErro : ""}`} type="date" value={t.dataInicio} onChange={(e) => atualizarTurma(t.id, "dataInicio", e.target.value)} /></Field>
+    </div><div className="mt-4 grid gap-3 sm:grid-cols-2"><ModalidadeTurma label="Regular" descricao="Total de alunos da turma, incluindo os especiais" checked={t.regular} alunos={t.alunosRegulares} erro={t.regular && t.alunosRegulares <= 0} onChecked={(v) => alternarModalidade(t.id, "regular", v)} onAlunos={(v) => atualizarTurma(t.id, "alunosRegulares", v)} /><ModalidadeTurma label="Especial" descricao="Alunos especiais que já estão incluídos no total regular" checked={t.especial} alunos={t.alunosEspeciais} erro={t.especial && (t.alunosEspeciais <= 0 || t.alunosEspeciais > t.alunosRegulares)} onChecked={(v) => alternarModalidade(t.id, "especial", v)} onAlunos={(v) => atualizarTurma(t.id, "alunosEspeciais", v)} /></div>{t.dataInicio && dataCadastroValida && !dataPosteriorAoCadastro(t.dataInicio) && <p className="mt-3 text-xs font-semibold text-brand-deep">Prazo restante: {mesesDeFuncionamento(t.dataInicio, dataCadastro)} meses</p>}</article>)}</div></section> :
     <section className="mt-5 bg-background p-5 shadow-sm ring-1 ring-ink/5 sm:p-6"><SectionTitle numero="2" titulo="Identificação e matrículas do estabelecimento" /><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Field label="Código INEP" required><div className="flex gap-2"><input aria-invalid={Boolean(erroInep) || !/^\d{8}$/.test(inep)} className={`${campo} ${erroInep ? campoErro : ""}`} inputMode="numeric" maxLength={8} placeholder="8 números" value={inep} onChange={(e) => { setInep(e.target.value.replace(/\D/g, "").slice(0, 8)); setEscola(null); setErroInep(""); }} onKeyDown={(e) => { if (e.key === "Enter") void buscarEscola(); }} /><Button variant="outline" size="icon" onClick={buscarEscola} disabled={buscandoEscola || inep.length !== 8} title="Consultar escola">{buscandoEscola ? <Loader2 className="animate-spin" /> : <Search />}</Button></div>{erroInep && <p className="mt-1.5 text-xs text-destructive">{erroInep}</p>}</Field>
-      <Field label="Mês de início" required><select aria-invalid={mesIndex === null} className={`${campo} ${mesIndex === null ? campoErro : ""}`} value={mesIndex ?? ""} onChange={(e) => setMesIndex(e.target.value === "" ? null : Number(e.target.value))}><option value="">Selecione</option>{MESES.map((m, i) => <option key={m} value={i}>{m}</option>)}</select></Field>
-      <Field label="Dia de início" required><input className={campo} type="number" min="1" max="31" value={diaInicio} onChange={(e) => setDiaInicio(String(Math.min(31, Math.max(1, Number(e.target.value) || 1))).padStart(2, "0"))} /></Field>
-       <Field label="Prazo do repasse"><div className="flex h-[42px] items-center rounded-md bg-brand/8 px-3 font-display font-bold text-brand-deep">{mesIndex === null ? "—" : `${mesesEstabelecimento} meses`}</div></Field>
+       <Field label="Data de início" required><input aria-invalid={!dataInicioEstabelecimento || dataPosteriorAoCadastro(dataInicioEstabelecimento)} className={`${campo} ${!dataInicioEstabelecimento || dataPosteriorAoCadastro(dataInicioEstabelecimento) ? campoErro : ""}`} type="date" value={dataInicioEstabelecimento} onChange={(e) => setDataInicioEstabelecimento(e.target.value)} /></Field>
+        <Field label="Prazo restante"><div className="flex h-[42px] items-center rounded-md bg-brand/8 px-3 font-display font-bold text-brand-deep">{!dataInicioEstabelecimento || !dataCadastroValida || dataPosteriorAoCadastro(dataInicioEstabelecimento) ? "—" : `${mesesEstabelecimento} meses`}</div></Field>
     </div>{escola && <div className="mt-4 flex items-start gap-3 border-l-4 border-special bg-special/8 px-4 py-3"><CheckCircle2 className="mt-0.5 size-5 shrink-0 text-special" /><div><p className="font-semibold">{escola.nome}</p><p className="text-xs text-ink/55">{escola.municipio}/{escola.uf} · {escola.situacao} · {escola.fonte}</p>{(escola.uf !== uf || String(municipios.find((m) => m.nome === escola.municipio)?.id ?? "") !== municipioId) && <p className="mt-1 text-xs font-semibold text-destructive">A localização da escola não corresponde ao município selecionado.</p>}</div></div>}
-    <p className="mt-6 text-sm text-ink/55">Informe somente as matrículas ainda não computadas no Fundeb regular.</p><div className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">{COMBINACOES.map((c) => <label key={c.chave} className="flex items-center justify-between gap-4 border-b border-ink/8 pb-3"><span className="text-sm font-medium">{c.rotulo}<small className="mt-0.5 block text-ink/45">Fator {fatorFmt(calcularFator(c.etapa, c.turno, c.modalidade))}</small></span><input className={`${campo} w-24 text-right font-semibold tabular-nums`} type="number" min="0" value={quantidades[c.chave] || ""} placeholder="0" onChange={(e) => setQuantidades((q) => ({ ...q, [c.chave]: Math.max(0, Number(e.target.value) || 0) }))} /></label>)}</div></section>}
+    <p className="mt-6 text-sm text-ink/55">Em Regular, informe o total de alunos. Em Especial, informe somente quantos desse total são especiais.</p><div className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">{COMBINACOES.map((c) => <label key={c.chave} className="flex items-center justify-between gap-4 border-b border-ink/8 pb-3"><span className="text-sm font-medium">{c.rotulo}<small className="mt-0.5 block text-ink/45">{c.modalidade === "Regular" ? "Total, incluindo especiais" : "Parte do total regular"} · Fator {fatorFmt(calcularFator(c.etapa, c.turno, c.modalidade))}</small></span><input className={`${campo} w-24 text-right font-semibold tabular-nums`} type="number" min="0" value={quantidades[c.chave] || ""} placeholder="0" onChange={(e) => setQuantidades((q) => ({ ...q, [c.chave]: Math.max(0, Number(e.target.value) || 0) }))} /></label>)}</div></section>}
 
     {avisos.length > 0 && <Alert variant="destructive" className="mt-5 bg-background"><AlertCircle /><AlertTitle>Revise os dados antes do cálculo</AlertTitle><AlertDescription><ul className="mt-2 list-disc space-y-1 pl-4">{avisos.map((aviso) => <li key={aviso}>{aviso}</li>)}</ul></AlertDescription></Alert>}
     <section className="mt-5 bg-gradient-to-r from-brand to-brand-deep p-5 text-primary-foreground shadow-sm sm:p-7"><div className="flex flex-wrap items-end justify-between gap-5"><div><p className="text-xs font-semibold uppercase text-primary-foreground/70">Valor total do repasse previsto</p><p className="mt-2 font-display text-3xl font-bold tabular-nums sm:text-5xl">{dadosValidos ? brl(totalRepasse) : "Aguardando dados"}</p></div><div className="flex gap-6 text-right"><Stat label="Matrículas" valor={totalAlunos} /><Stat label={modo === "turmas" ? "Turmas" : "Categorias"} valor={modo === "turmas" ? turmas.length : resultados.length} /></div></div></section>
     <section className="mt-5 overflow-hidden bg-background shadow-sm ring-1 ring-ink/5"><div className="flex items-center gap-2 border-b border-ink/8 px-5 py-4"><span className="grid size-6 place-items-center rounded-md bg-brand/10 text-xs font-bold text-brand">3</span><h2 className="font-display text-sm font-bold uppercase">Resultado detalhado</h2></div><div className="overflow-x-auto"><table className="w-full min-w-[780px] text-sm"><thead><tr className="border-b border-ink/8 text-left text-[11px] uppercase text-ink/50"><th className="px-5 py-3">Etapa / turno</th><th className="px-4 py-3">Modalidade</th><th className="px-4 py-3">Meses</th><th className="px-4 py-3">Fator</th><th className="px-4 py-3 text-right">Alunos</th><th className="px-4 py-3 text-right">Valor anual</th><th className="px-5 py-3 text-right">Repasse proporcional</th></tr></thead><tbody className="divide-y divide-ink/5">{resultados.length === 0 ? <tr><td colSpan={7} className="px-5 py-10 text-center text-ink/45">Preencha e revise os campos obrigatórios para calcular.</td></tr> : resultados.map((r) => <tr key={r.chave}><td className="px-5 py-3.5 font-medium">{r.etapa} · {r.turno}</td><td className="px-4 py-3.5 text-ink/65">{r.modalidade}</td><td className="px-4 py-3.5">{r.meses}</td><td className="px-4 py-3.5"><span className={`rounded px-2 py-1 text-xs font-bold ${r.modalidade === "Educação Especial" ? "bg-special/12 text-special" : "bg-brand/10 text-brand"}`}>{fatorFmt(r.fator)}</span></td><td className="px-4 py-3.5 text-right font-semibold">{r.alunos}</td><td className="px-4 py-3.5 text-right tabular-nums">{brl(r.valorAnual)}</td><td className="px-5 py-3.5 text-right font-display font-bold tabular-nums">{brl(r.repasse)}</td></tr>)}</tbody>{resultados.length > 0 && <tfoot><tr className="border-t-2 border-ink/10 bg-canvas/50 font-bold"><td className="px-5 py-4" colSpan={4}>Total geral</td><td className="px-4 py-4 text-right">{totalAlunos}</td><td className="px-4 py-4 text-right tabular-nums">{brl(totalAnual)}</td><td className="px-5 py-4 text-right font-display text-brand-deep tabular-nums">{brl(totalRepasse)}</td></tr></tfoot>}</table></div></section>
-    <footer className="py-6 text-center text-[11px] text-ink/40">Cálculo: valor anual por aluno ÷ 12 × 18 meses. Estimativa sujeita à validação pelo FNDE.</footer>
+    <footer className="py-6 text-center text-[11px] text-ink/40">Cálculo: valor anual por aluno ÷ 12 × meses restantes, até o limite de 18 meses. Alunos especiais não são contados em duplicidade.</footer>
   </div></main>;
 }
 
-function ModalidadeTurma({ label, checked, alunos, erro, onChecked, onAlunos }: { label: string; checked: boolean; alunos: number; erro: boolean; onChecked: (v: boolean) => void; onAlunos: (v: number) => void }) { return <div className={`rounded-md border p-3 ${checked ? "border-brand/25 bg-brand/5" : "border-ink/10"}`}><label className="flex cursor-pointer items-center gap-2 text-sm font-semibold"><Checkbox checked={checked} onCheckedChange={(v) => onChecked(v === true)} />{label}</label><label className="mt-3 block"><span className="mb-1.5 block text-xs text-ink/60">Quantidade de alunos {label.toLowerCase()}</span><input aria-invalid={erro} className={`${campo} ${erro ? campoErro : ""}`} type="number" min="0" disabled={!checked} value={alunos || ""} placeholder="0" onChange={(e) => onAlunos(Math.max(0, Number(e.target.value) || 0))} /></label></div>; }
+function ModalidadeTurma({ label, descricao, checked, alunos, erro, onChecked, onAlunos }: { label: string; descricao: string; checked: boolean; alunos: number; erro: boolean; onChecked: (v: boolean) => void; onAlunos: (v: number) => void }) { return <div className={`rounded-md border p-3 ${checked ? "border-brand/25 bg-brand/5" : "border-ink/10"}`}><label className="flex cursor-pointer items-center gap-2 text-sm font-semibold"><Checkbox checked={checked} onCheckedChange={(v) => onChecked(v === true)} />{label}</label><p className="mt-1 text-xs text-ink/50">{descricao}</p><label className="mt-3 block"><span className="mb-1.5 block text-xs text-ink/60">Quantidade de alunos {label.toLowerCase()}</span><input aria-invalid={erro} className={`${campo} ${erro ? campoErro : ""}`} type="number" min="0" disabled={!checked} value={alunos || ""} placeholder="0" onChange={(e) => onAlunos(Math.max(0, Number(e.target.value) || 0))} /></label></div>; }
+function formatarData(data: string): string { const [ano, mes, dia] = data.split("-"); return ano && mes && dia ? `${dia}/${mes}/${ano}` : "Não informada"; }
 function Field({ label, children, required = false }: { label: string; children: React.ReactNode; required?: boolean }) { return <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink/65">{label}{required && <span className="ml-1 text-destructive" aria-hidden="true">*</span>}</span>{children}</label>; }
 function SectionTitle({ numero, titulo, children }: { numero: string; titulo: string; children?: React.ReactNode }) { return <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-2"><span className="grid size-6 place-items-center rounded-md bg-brand/10 text-xs font-bold text-brand">{numero}</span><h2 className="font-display text-sm font-bold uppercase">{titulo}</h2></div>{children}</div>; }
 function Stat({ label, valor }: { label: string; valor: number }) { return <div><p className="text-[11px] text-primary-foreground/60">{label}</p><p className="font-display text-lg font-bold">{numeroFmt(valor).replace(",00", "")}</p></div>; }
