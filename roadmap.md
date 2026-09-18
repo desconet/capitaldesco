@@ -7,3 +7,4 @@
 - [x] Novas Turmas: mês por turma e matrículas regulares/especiais separadas
 - [x] Novos Estabelecimentos: consulta do nome da escola pelo código INEP
 - [x] Validações claras para localidade, VAAF, datas, matrículas e campos obrigatórios
+- [x] Prazo de repasse corrigido para 18 meses nas duas calculadoras e no PDF

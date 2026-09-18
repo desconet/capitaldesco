@@ -33,9 +33,12 @@ export function calcularFator(etapa: Etapa, turno: Turno, modalidade: Modalidade
   return modalidade === "Educação Especial" ? Math.max(1.2, base) : base;
 }
 
-/** Janeiro (0) = 12 meses ... Dezembro (11) = 1 mês. */
-export function mesesDeFuncionamento(mesIndex: number): number {
-  return Math.min(12, Math.max(1, 12 - mesIndex));
+/** Prazo máximo de pagamento dos programas: 18 meses. */
+export const MESES_MAXIMOS_REPASSE = 18;
+
+/** O mês identifica o início cadastrado; o programa projeta até 18 meses de repasse. */
+export function mesesDeFuncionamento(_mesIndex: number): number {
+  return MESES_MAXIMOS_REPASSE;
 }
 
 export function calcularRepasse(
