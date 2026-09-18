@@ -254,7 +254,7 @@ function Index() {
                       key={t.id}
                       className="rounded-xl border border-ink/8 bg-canvas/40 p-3"
                     >
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_1.5fr_0.9fr]">
                         <select
                           value={t.etapa}
                           onChange={(e) =>
