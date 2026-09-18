@@ -103,6 +103,21 @@
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+
+  /* Civic mesh gradient palette */
+  --brand: oklch(0.517 0.224 264.7);
+  --brand-deep: oklch(0.351 0.133 264.5);
+  --special: oklch(0.609 0.127 164.1);
+  --ink: oklch(0.22 0.035 266.5);
+  --canvas: oklch(0.959 0.014 272.7);
+}
+
+@utility bg-civic-mesh {
+  background:
+    radial-gradient(46% 55% at 12% 6%, oklch(0.874 0.061 271.9) 0%, transparent 60%),
+    radial-gradient(42% 52% at 88% 12%, oklch(0.9 0.048 172.9) 0%, transparent 60%),
+    radial-gradient(60% 60% at 50% 100%, oklch(0.937 0.03 275.6) 0%, transparent 72%),
+    oklch(0.959 0.014 272.7);
 }
 
 .dark {
