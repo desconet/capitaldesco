@@ -30,7 +30,7 @@ export const Route = createFileRoute("/")({
 type Modo = "turmas" | "estabelecimentos";
 interface Turma { id: number; etapa: Etapa; turno: Turno; dataInicio: string; regular: boolean; especial: boolean; alunosRegulares: number; alunosEspeciais: number }
 type Quantidades = Record<string, number>;
-type Resultado = { chave: string; etapa: Etapa; turno: Turno; modalidade: Modalidade; fator: number; alunos: number; meses: number; valorAnual: number; repasse: number };
+type Resultado = { chave: string; etapa: Etapa; turno: Turno; modalidade: Modalidade; dataInicio: string; fator: number; alunos: number; meses: number; valorAnual: number; repasse: number };
 
 const campo = "w-full rounded-md border border-ink/10 bg-background px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15 disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink/35";
 const campoErro = "border-destructive/60 focus:border-destructive focus:ring-destructive/15";
@@ -128,11 +128,11 @@ function Index() {
     const alunosSemEspecial = Math.max(0, t.alunosRegulares - alunosEspeciais);
     if (t.regular && alunosSemEspecial > 0) {
       const modalidade: Modalidade = "Regular"; const fator = calcularFator(t.etapa, t.turno, modalidade);
-      categorias.push({ chave: `${t.id}-regular`, etapa: t.etapa, turno: t.turno, modalidade, fator, alunos: alunosSemEspecial, meses, ...calcularRepasse(vaaf, fator, alunosSemEspecial, meses) });
+      categorias.push({ chave: `${t.id}-regular`, etapa: t.etapa, turno: t.turno, modalidade, dataInicio: t.dataInicio, fator, alunos: alunosSemEspecial, meses, ...calcularRepasse(vaaf, fator, alunosSemEspecial, meses) });
     }
     if (t.especial && alunosEspeciais > 0) {
       const modalidade: Modalidade = "Educação Especial"; const fator = calcularFator(t.etapa, t.turno, modalidade);
-      categorias.push({ chave: `${t.id}-especial`, etapa: t.etapa, turno: t.turno, modalidade, fator, alunos: alunosEspeciais, meses, ...calcularRepasse(vaaf, fator, alunosEspeciais, meses) });
+      categorias.push({ chave: `${t.id}-especial`, etapa: t.etapa, turno: t.turno, modalidade, dataInicio: t.dataInicio, fator, alunos: alunosEspeciais, meses, ...calcularRepasse(vaaf, fator, alunosEspeciais, meses) });
     }
     return categorias;
   }), [turmas, vaaf, dataCadastro, dataCadastroValida]);
@@ -144,14 +144,14 @@ function Index() {
     const linhas: Resultado[] = [];
     if (alunosSemEspecial > 0) {
       const fator = calcularFator(regular.etapa, regular.turno, regular.modalidade);
-      linhas.push({ chave: regular.chave, etapa: regular.etapa, turno: regular.turno, modalidade: regular.modalidade, fator, alunos: alunosSemEspecial, meses: mesesEstabelecimento, ...calcularRepasse(vaaf, fator, alunosSemEspecial, mesesEstabelecimento) });
+      linhas.push({ chave: regular.chave, etapa: regular.etapa, turno: regular.turno, modalidade: regular.modalidade, dataInicio: dataInicioEstabelecimento, fator, alunos: alunosSemEspecial, meses: mesesEstabelecimento, ...calcularRepasse(vaaf, fator, alunosSemEspecial, mesesEstabelecimento) });
     }
     if (especial && alunosEspeciais > 0) {
       const fator = calcularFator(especial.etapa, especial.turno, especial.modalidade);
-      linhas.push({ chave: especial.chave, etapa: especial.etapa, turno: especial.turno, modalidade: especial.modalidade, fator, alunos: alunosEspeciais, meses: mesesEstabelecimento, ...calcularRepasse(vaaf, fator, alunosEspeciais, mesesEstabelecimento) });
+      linhas.push({ chave: especial.chave, etapa: especial.etapa, turno: especial.turno, modalidade: especial.modalidade, dataInicio: dataInicioEstabelecimento, fator, alunos: alunosEspeciais, meses: mesesEstabelecimento, ...calcularRepasse(vaaf, fator, alunosEspeciais, mesesEstabelecimento) });
     }
     return linhas;
-  }), [quantidades, vaaf, mesesEstabelecimento]);
+  }), [quantidades, vaaf, mesesEstabelecimento, dataInicioEstabelecimento]);
   const resultados = dadosValidos ? (modo === "turmas" ? resultadosTurmas : resultadosEstabelecimento) : [];
   const totalAlunos = resultados.reduce((s, r) => s + r.alunos, 0);
   const totalAnual = resultados.reduce((s, r) => s + r.valorAnual, 0);
@@ -177,8 +177,8 @@ function Index() {
        doc.text(`Data de cadastro: ${formatarData(dataCadastro)}`, 14, 65);
        inicioTabela = 74;
        if (modo === "estabelecimentos" && escola) { doc.text(`Escola: ${escola.nome} · INEP ${inep}`, 14, 72, { maxWidth: 182 }); doc.text(`Início: ${formatarData(dataInicioEstabelecimento)} · Meses restantes: ${mesesEstabelecimento}`, 14, 79); inicioTabela = 87; }
-      const linhas = resultados.map((r) => [`${r.etapa} / ${r.turno}`, r.modalidade === "Educação Especial" ? "Especial" : "Regular", String(r.meses), fatorFmt(r.fator), String(r.alunos), brl(r.valorAnual), brl(r.repasse)]);
-      autoTableModule.default(doc, { startY: inicioTabela, head: [["Etapa / Turno", "Modalidade", "Meses", "Fator", "Alunos", "Valor anual", "Repasse"]], body: linhas, foot: [["TOTAL", "", "", "", String(totalAlunos), brl(totalAnual), brl(totalRepasse)]], styles: { font: "DejaVuSans", fontSize: 7.5, cellPadding: 2.2 }, headStyles: { fillColor: [28, 75, 145] }, footStyles: { fillColor: [230, 238, 249], textColor: [25, 34, 53], fontStyle: "bold" } });
+       const linhas = resultados.map((r) => [`${r.etapa} / ${r.turno}`, r.modalidade === "Educação Especial" ? "Especial" : "Regular", formatarData(r.dataInicio), String(r.meses), fatorFmt(r.fator), String(r.alunos), brl(r.valorAnual), brl(r.repasse)]);
+       autoTableModule.default(doc, { startY: inicioTabela, head: [["Etapa / Turno", "Modalidade", "Início", "Meses", "Fator", "Alunos", "Valor anual", "Repasse"]], body: linhas, foot: [["TOTAL", "", "", "", "", String(totalAlunos), brl(totalAnual), brl(totalRepasse)]], styles: { font: "DejaVuSans", fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [28, 75, 145] }, footStyles: { fillColor: [230, 238, 249], textColor: [25, 34, 53], fontStyle: "bold" } });
       const finalY = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 100; doc.setFontSize(8); doc.setTextColor(90, 99, 116); doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")} · Valores estimativos sujeitos à validação pelo FNDE.`, 14, finalY + 10);
       doc.save(`simulacao-fnde-${municipio.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-")}.pdf`);
     } finally { setExportando(false); }
