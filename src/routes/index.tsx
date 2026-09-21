@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Building2, CheckCircle2, FileDown, Info, Loader2, Plus, RefreshCw, Search, School, Trash2 } from "lucide-react";
 
 import pdfFontUrl from "@/assets/DejaVuSans.ttf?url";
+import capitalLogo from "@/assets/capital-consultoria-logo.jpg.asset.json";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -166,12 +167,14 @@ function Index() {
     if (!dadosValidos) return;
     setExportando(true);
     try {
-      const [{ jsPDF }, autoTableModule] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
-      const doc = new jsPDF(); const fonte = await fetch(pdfFontUrl).then((r) => r.arrayBuffer()); let binario = ""; const bytes = new Uint8Array(fonte);
+      const [{ jsPDF }, autoTableModule, fonte, logo] = await Promise.all([import("jspdf"), import("jspdf-autotable"), fetch(pdfFontUrl).then((r) => r.arrayBuffer()), fetch(capitalLogo.url).then((r) => r.arrayBuffer())]);
+      const doc = new jsPDF(); let binario = ""; const bytes = new Uint8Array(fonte);
       for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
       doc.addFileToVFS("DejaVuSans.ttf", btoa(binario)); doc.addFont("DejaVuSans.ttf", "DejaVuSans", "normal"); doc.setFont("DejaVuSans");
-      doc.setFillColor(28, 75, 145); doc.rect(0, 0, 210, 34, "F"); doc.setTextColor(255, 255, 255); doc.setFontSize(18); doc.text("Relatório de Simulação FNDE", 14, 16);
-      doc.setFontSize(10); doc.text(modo === "turmas" ? "Novas Turmas" : "Novos Estabelecimentos", 14, 25); doc.setTextColor(25, 34, 53); doc.setFontSize(10);
+      const tituloRelatorio = modo === "turmas" ? "Relatório Novas Turmas" : "Relatório Novos Estabelecimentos";
+      doc.setFillColor(28, 75, 145); doc.rect(0, 0, 210, 34, "F"); doc.setFillColor(255, 255, 255); doc.roundedRect(10, 5, 56, 23, 1.5, 1.5, "F"); doc.addImage(new Uint8Array(logo), "JPEG", 12, 8, 52, 16.6);
+      doc.setTextColor(255, 255, 255); doc.setFontSize(15); doc.text(tituloRelatorio, 72, 16);
+      doc.setFontSize(9); doc.text("Programa de Repasse FNDE", 72, 24); doc.setTextColor(25, 34, 53); doc.setFontSize(10);
       doc.text(`Município: ${municipio} / ${uf}`, 14, 44); doc.text(`VAAF base: ${brl(vaaf)}`, 14, 51); doc.text(`Fonte: ${fonteVaaf}`, 14, 58, { maxWidth: 182 });
       let inicioTabela = 68;
        doc.text(`Data de cadastro: ${formatarData(dataCadastro)}`, 14, 65);
@@ -180,7 +183,8 @@ function Index() {
        const linhas = resultados.map((r) => [`${r.etapa} / ${r.turno}`, r.modalidade === "Educação Especial" ? "Especial" : "Regular", formatarData(r.dataInicio), String(r.meses), fatorFmt(r.fator), String(r.alunos), brl(r.valorAnual), brl(r.repasse)]);
        autoTableModule.default(doc, { startY: inicioTabela, head: [["Etapa / Turno", "Modalidade", "Início", "Meses", "Fator", "Alunos", "Valor anual", "Repasse"]], body: linhas, foot: [["TOTAL", "", "", "", "", String(totalAlunos), brl(totalAnual), brl(totalRepasse)]], styles: { font: "DejaVuSans", fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [28, 75, 145] }, footStyles: { fillColor: [230, 238, 249], textColor: [25, 34, 53], fontStyle: "bold" } });
       const finalY = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 100; doc.setFontSize(8); doc.setTextColor(90, 99, 116); doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")} · Valores estimativos sujeitos à validação pelo FNDE.`, 14, finalY + 10);
-      doc.save(`simulacao-fnde-${municipio.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-")}.pdf`);
+      const tipoArquivo = modo === "turmas" ? "novas-turmas" : "novos-estabelecimentos";
+      doc.save(`relatorio-${tipoArquivo}-${municipio.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-")}.pdf`);
     } finally { setExportando(false); }
   }
 
