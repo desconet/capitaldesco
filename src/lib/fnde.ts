@@ -13,7 +13,7 @@ export const MESES = [
   "Dezembro",
 ] as const;
 
-/** VAAF mínimo nacional do Fundeb — exercício 2026 (Portaria Interministerial MEC/MF nº 14/2025). */
+/** VAAF mínimo nacional do Fundeb — exercício 2026. */
 export const VAAF_NACIONAL_2026 = 5962.79;
 /** VAAT mínimo nacional do Fundeb — exercício 2026. */
 export const VAAT_NACIONAL_2026 = 10194.38;
@@ -22,21 +22,6 @@ export const ANO_REFERENCIA = 2026;
 export type Etapa = "Creche" | "Pré-escola";
 export type Turno = "Integral" | "Parcial";
 export type Modalidade = "Regular" | "Educação Especial";
-
-/**
- * Valores unitários do Fundeb utilizados pelo SIMEC.
- * Regra do FNDE: A base de cálculo utiliza sempre os valores estabelecidos para o "ano anterior".
- */
-export const VALORES_UNITARIOS_SIMEC: Record<Etapa, Record<Turno, number>> = {
-  Creche: {
-    Integral: 8830.09,
-    Parcial: 7121.04,
-  },
-  "Pré-escola": {
-    Integral: 8545.25,
-    Parcial: 6551.36,
-  },
-};
 
 export const FATOR_BASE: Record<Etapa, Record<Turno, number>> = {
   Creche: { Integral: 1.4, Parcial: 1.2 },
@@ -66,17 +51,36 @@ export function mesesDeFuncionamento(dataInicio: string, dataCadastro: string): 
 }
 
 /**
- * Novo cálculo de repasse espelhado no comportamento do SIMEC.
+ * Cálculo de repasse adaptado!
+ * Como o frontend ainda envia (vaaf, fator, alunos, meses), nós recebemos esses dados numéricos.
+ * Usamos o valor do 'fator' para "adivinhar" a categoria e aplicar a tabela fixa do SIMEC.
  */
 export function calcularRepasse(
-  etapa: Etapa,
-  turno: Turno,
+  vaaf: number,
+  fator: number,
   alunos: number,
   meses: number,
 ): { valorAnual: number; repasse: number } {
-  const valorUnitario = VALORES_UNITARIOS_SIMEC[etapa][turno];
-  const valorAnual = valorUnitario * alunos;
+  let valorUnitario = 0;
 
+  // Arredonda o fator para 2 casas decimais para garantir a comparação exata
+  const f = Number(fator.toFixed(2));
+
+  // Mapeia o fator para o Valor Unitário tabelado do SIMEC
+  if (f === 1.4) {
+    valorUnitario = 8830.09; // Creche Integral
+  } else if (f === 1.3) {
+    valorUnitario = 8545.25; // Pré-escola Integral
+  } else if (f === 1.2) {
+    valorUnitario = 7121.04; // Creche Parcial (Regular ou Especial)
+  } else if (f === 1.1) {
+    valorUnitario = 6551.36; // Pré-escola Parcial
+  } else {
+    // Fallback de segurança se o fator for diferente
+    valorUnitario = vaaf * fator;
+  }
+
+  const valorAnual = valorUnitario * alunos;
   return { valorAnual, repasse: (valorAnual / 12) * meses };
 }
 
