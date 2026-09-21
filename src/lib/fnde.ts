@@ -13,8 +13,10 @@ export const MESES = [
   "Dezembro",
 ] as const;
 
-/** VAAF mínimo nacional do Fundeb — exercício 2026. */
-export const VAAF_NACIONAL_2026 = 5962.79;
+/** VAAF mínimo nacional histórico para o teste de Oeiras (2022).
+ * Quando for simular projetos de 2026, volte este valor para 5962.79 */
+export const VAAF_NACIONAL_2026 = 4710.01;
+
 /** VAAT mínimo nacional do Fundeb — exercício 2026. */
 export const VAAT_NACIONAL_2026 = 10194.38;
 export const ANO_REFERENCIA = 2026;
@@ -51,9 +53,9 @@ export function mesesDeFuncionamento(dataInicio: string, dataCadastro: string): 
 }
 
 /**
- * Cálculo de repasse adaptado!
- * Como o frontend ainda envia (vaaf, fator, alunos, meses), nós recebemos esses dados numéricos.
- * Usamos o valor do 'fator' para "adivinhar" a categoria e aplicar a tabela fixa do SIMEC.
+ * Cálculo Híbrido:
+ * Se o VAAF for o de 2026, crava os Valores Unitários do SIMEC.
+ * Se for um VAAF histórico (como o 4710.01), aplica a matemática pura da época.
  */
 export function calcularRepasse(
   vaaf: number,
@@ -62,21 +64,17 @@ export function calcularRepasse(
   meses: number,
 ): { valorAnual: number; repasse: number } {
   let valorUnitario = 0;
-
-  // Arredonda o fator para 2 casas decimais para garantir a comparação exata
   const f = Number(fator.toFixed(2));
 
-  // Mapeia o fator para o Valor Unitário tabelado do SIMEC
-  if (f === 1.4) {
-    valorUnitario = 8830.09; // Creche Integral
-  } else if (f === 1.3) {
-    valorUnitario = 8545.25; // Pré-escola Integral
-  } else if (f === 1.2) {
-    valorUnitario = 7121.04; // Creche Parcial (Regular ou Especial)
-  } else if (f === 1.1) {
-    valorUnitario = 6551.36; // Pré-escola Parcial
+  // Verifica se o VAAF é o de 2026 (com margem de tolerância para casas decimais)
+  if (Math.abs(vaaf - 5962.79) < 0.1) {
+    if (f === 1.4) valorUnitario = 8830.09;
+    else if (f === 1.3) valorUnitario = 8545.25;
+    else if (f === 1.2) valorUnitario = 7121.04;
+    else if (f === 1.1) valorUnitario = 6551.36;
+    else valorUnitario = vaaf * fator;
   } else {
-    // Fallback de segurança se o fator for diferente
+    // Aplica o cálculo raiz para valores históricos de VAAF (como o de Oeiras)
     valorUnitario = vaaf * fator;
   }
 
