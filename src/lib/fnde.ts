@@ -13,6 +13,10 @@ export const MESES = [
   "Dezembro",
 ] as const;
 
+/** VAAF mínimo nacional do Fundeb — exercício 2026 (Portaria Interministerial MEC/MF nº 14/2025). */
+export const VAAF_NACIONAL_2026 = 5962.79;
+/** VAAT mínimo nacional do Fundeb — exercício 2026. */
+export const VAAT_NACIONAL_2026 = 10194.38;
 export const ANO_REFERENCIA = 2026;
 
 export type Etapa = "Creche" | "Pré-escola";
@@ -48,7 +52,9 @@ export const MESES_MAXIMOS_REPASSE = 18;
 
 export function mesesDeFuncionamento(dataInicio: string, dataCadastro: string): number {
   const inicio = dataInicio.split("-").map(Number);
+
   if (inicio.length !== 3 || inicio.some(Number.isNaN)) return 0;
+
   const [anoInicio, mesInicio, diaInicio] = inicio;
   if (!anoInicio || !mesInicio || !diaInicio) return 0;
 
@@ -61,7 +67,6 @@ export function mesesDeFuncionamento(dataInicio: string, dataCadastro: string): 
 
 /**
  * Novo cálculo de repasse espelhado no comportamento do SIMEC.
- * Substitui a multiplicação (VAAF * Fator) pelo Valor Unitário tabelado da etapa/turno.
  */
 export function calcularRepasse(
   etapa: Etapa,
@@ -69,13 +74,9 @@ export function calcularRepasse(
   alunos: number,
   meses: number,
 ): { valorAnual: number; repasse: number } {
-  // Puxa o valor unitário fixo da tabela espelhada do SIMEC
   const valorUnitario = VALORES_UNITARIOS_SIMEC[etapa][turno];
-
-  // O Valor Anual total para todos os alunos daquela categoria
   const valorAnual = valorUnitario * alunos;
 
-  // Repasse proporcional aos meses de direito
   return { valorAnual, repasse: (valorAnual / 12) * meses };
 }
 
@@ -86,6 +87,12 @@ export const brl = (n: number) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+export const fatorFmt = (n: number) =>
+  n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export const numeroFmt = (n: number) =>
+  n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export interface Combinacao {
   chave: string;
