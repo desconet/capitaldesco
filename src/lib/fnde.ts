@@ -13,11 +13,13 @@ export const MESES = [
   "Dezembro",
 ] as const;
 
-/** VAAF mínimo nacional histórico para o teste de Oeiras (2022).
- * Quando for simular projetos de 2026, volte este valor para 5962.79 */
+/**
+ * CONTROLE DE VAAF MESTRE:
+ * Altere aqui para 5962.79 quando for testar projetos de 2026 (Simplício Mendes).
+ * Deixe 4710.01 para testar projetos históricos de 2022 (Oeiras).
+ */
 export const VAAF_NACIONAL_2026 = 4710.01;
 
-/** VAAT mínimo nacional do Fundeb — exercício 2026. */
 export const VAAT_NACIONAL_2026 = 10194.38;
 export const ANO_REFERENCIA = 2026;
 
@@ -39,7 +41,6 @@ export const MESES_MAXIMOS_REPASSE = 18;
 
 export function mesesDeFuncionamento(dataInicio: string, dataCadastro: string): number {
   const inicio = dataInicio.split("-").map(Number);
-
   if (inicio.length !== 3 || inicio.some(Number.isNaN)) return 0;
 
   const [anoInicio, mesInicio, diaInicio] = inicio;
@@ -52,13 +53,8 @@ export function mesesDeFuncionamento(dataInicio: string, dataCadastro: string): 
   return Math.min(MESES_MAXIMOS_REPASSE, totalMeses);
 }
 
-/**
- * Cálculo Híbrido:
- * Se o VAAF for o de 2026, crava os Valores Unitários do SIMEC.
- * Se for um VAAF histórico (como o 4710.01), aplica a matemática pura da época.
- */
 export function calcularRepasse(
-  vaaf: number,
+  vaaf_enviado_pela_tela: number, // Vamos ignorar o que a tela teimosa manda
   fator: number,
   alunos: number,
   meses: number,
@@ -66,16 +62,16 @@ export function calcularRepasse(
   let valorUnitario = 0;
   const f = Number(fator.toFixed(2));
 
-  // Verifica se o VAAF é o de 2026 (com margem de tolerância para casas decimais)
-  if (Math.abs(vaaf - 5962.79) < 0.1) {
+  // Usamos EXCLUSIVAMENTE a constante mestre do topo do arquivo
+  if (Math.abs(VAAF_NACIONAL_2026 - 5962.79) < 0.1) {
     if (f === 1.4) valorUnitario = 8830.09;
     else if (f === 1.3) valorUnitario = 8545.25;
     else if (f === 1.2) valorUnitario = 7121.04;
     else if (f === 1.1) valorUnitario = 6551.36;
-    else valorUnitario = vaaf * fator;
+    else valorUnitario = VAAF_NACIONAL_2026 * fator;
   } else {
-    // Aplica o cálculo raiz para valores históricos de VAAF (como o de Oeiras)
-    valorUnitario = vaaf * fator;
+    // Aplica o cálculo puro de 2022 (VAAF x Fator)
+    valorUnitario = VAAF_NACIONAL_2026 * fator;
   }
 
   const valorAnual = valorUnitario * alunos;
