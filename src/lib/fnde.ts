@@ -36,19 +36,26 @@ export function calcularFator(etapa: Etapa, turno: Turno, modalidade: Modalidade
 /** Prazo máximo de pagamento dos programas: 18 meses. */
 export const MESES_MAXIMOS_REPASSE = 18;
 
-/** Calcula os meses restantes, descontando os meses entre o início e o cadastro. */
+/** Calcula os meses de repasse segundo as Resoluções FNDE nº 15 e nº 16 de 2013 (Art. 6º).
+ * Contagem do mês de início de funcionamento até dezembro do ano subsequente, limitados a 18 meses. */
 export function mesesDeFuncionamento(dataInicio: string, dataCadastro: string): number {
   const inicio = dataInicio.split("-").map(Number);
-  const cadastro = dataCadastro.split("-").map(Number);
-  if (inicio.length !== 3 || cadastro.length !== 3 || inicio.some(Number.isNaN) || cadastro.some(Number.isNaN)) return 0;
+
+  if (inicio.length !== 3 || inicio.some(Number.isNaN)) return 0;
+
   const [anoInicio, mesInicio, diaInicio] = inicio;
-  const [anoCadastro, mesCadastro, diaCadastro] = cadastro;
-  if (!anoInicio || !mesInicio || !diaInicio || !anoCadastro || !mesCadastro || !diaCadastro) return 0;
-  const inicioUtc = Date.UTC(anoInicio, mesInicio - 1, diaInicio);
-  const cadastroUtc = Date.UTC(anoCadastro, mesCadastro - 1, diaCadastro);
-  if (inicioUtc > cadastroUtc) return 0;
-  const mesesDecorridos = (anoCadastro - anoInicio) * 12 + (mesCadastro - mesInicio);
-  return Math.max(0, Math.min(MESES_MAXIMOS_REPASSE, MESES_MAXIMOS_REPASSE - mesesDecorridos));
+  if (!anoInicio || !mesInicio || !diaInicio) return 0;
+
+  // Calcula quantos meses o estabelecimento funcionou no ano de início (incluindo o mês de início)
+  const mesesNoAnoDeInicio = 12 - mesInicio + 1;
+
+  // Adiciona os 12 meses do ano subsequente (até dezembro)
+  const mesesAnoSubsequente = 12;
+
+  // Soma os meses e aplica o teto máximo de 18 meses do programa
+  const totalMeses = mesesNoAnoDeInicio + mesesAnoSubsequente;
+
+  return Math.min(MESES_MAXIMOS_REPASSE, totalMeses);
 }
 
 export function calcularRepasse(
