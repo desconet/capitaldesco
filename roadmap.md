@@ -11,3 +11,5 @@
 - [x] Usar a data de cadastro para descontar os meses já transcorridos do limite de 18 meses
 - [x] Tratar alunos especiais como subconjunto do total regular, sem dupla contagem
 - [x] Atualizar validações, resultados e PDF com as novas regras
+
+- [x] Personalizar o título do PDF por programa e incluir a logo da Capital Consultoria
