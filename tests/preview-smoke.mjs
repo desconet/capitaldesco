@@ -77,14 +77,20 @@ async function setEstablishmentQuantity(page, rowText, value) {
   await row.locator('input[type="number"]').fill(String(value));
 }
 
+async function fillInputInLabel(page, labelText, value, type = "date") {
+  const label = page.locator("label").filter({ hasText: labelText }).first();
+  await label.locator(`input[type="${type}"]`).fill(value);
+}
+
 async function simplcioMendes() {
   const page = await context.newPage();
   const errors = await pageReady(page);
 
   await page.getByRole("button", { name: "Novos Estabelecimentos" }).click();
+  await page.getByRole("heading", { name: "Identificação e matrículas do estabelecimento" }).waitFor();
   await fillLocation(page, "PI", "Simplício Mendes");
-  await page.getByLabel(/Data de registro\/envio no Simec/).fill("2026-07-22");
-  await page.getByLabel("Data de início", { exact: true }).fill("2026-05-29");
+  await fillInputInLabel(page, "Data de registro/envio no Simec", "2026-07-22");
+  await fillInputInLabel(page, "Data de início", "2026-05-29");
 
   await setEstablishmentQuantity(page, "Regular · Creche Parcial", 64);
   await setEstablishmentQuantity(page, "Regular · Pré-escola Parcial", 4);
@@ -113,9 +119,10 @@ async function vicentinopolis() {
   const errors = await pageReady(page);
 
   await page.getByRole("button", { name: "Novos Estabelecimentos" }).click();
+  await page.getByRole("heading", { name: "Identificação e matrículas do estabelecimento" }).waitFor();
   await fillLocation(page, "GO", "Vicentinópolis");
-  await page.getByLabel(/Data de registro\/envio no Simec/).fill("2026-05-07");
-  await page.getByLabel("Data de início", { exact: true }).fill("2025-09-26");
+  await fillInputInLabel(page, "Data de registro/envio no Simec", "2026-05-07");
+  await fillInputInLabel(page, "Data de início", "2025-09-26");
 
   await setEstablishmentQuantity(page, "Regular · Pré-escola Parcial", 34);
 
@@ -132,8 +139,8 @@ async function specialSubsetAndValidation() {
   const errors = await pageReady(page);
 
   await fillLocation(page, "PI", "Simplício Mendes");
-  await page.getByLabel(/Data de registro\/envio no Simec/).fill("2026-06-15");
-  await page.getByLabel("Data de início", { exact: true }).fill("2026-06-01");
+  await fillInputInLabel(page, "Data de registro/envio no Simec", "2026-06-15");
+  await fillInputInLabel(page, "Data de início", "2026-06-01");
   await page.getByLabel("Turno").selectOption("Parcial");
 
   await page.getByLabel("Quantidade de alunos regular").fill("20");
