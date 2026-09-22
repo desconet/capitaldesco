@@ -1,0 +1,36 @@
+name: recover-logo
+
+on:
+  push:
+    branches:
+      - "fix/fnde-calculation-hardening"
+
+permissions:
+  contents: write
+
+jobs:
+  recover:
+    if: github.event.head_commit.message != 'assets: vendor Capital Consultoria logo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "fix/fnde-calculation-hardening"
+      - name: Download Lovable-managed logo into repository
+        run: |
+          mkdir -p public
+          curl --fail --location --silent --show-error             "https://capitaldesco.lovable.app/__l5e/assets-v1/19d1bcef-1a46-4938-b404-4e55dcd230e2/capital-consultoria-logo.jpg"             --output public/capital-consultoria-logo.jpg
+          test "$(stat -c%s public/capital-consultoria-logo.jpg)" -gt 10000
+          test "$(file --brief --mime-type public/capital-consultoria-logo.jpg)" = "image/jpeg"
+      - name: Commit vendored asset
+        run: |
+          if git diff --quiet -- public/capital-consultoria-logo.jpg && git ls-files --error-unmatch public/capital-consultoria-logo.jpg >/dev/null 2>&1; then
+            echo "Logo already vendored."
+            exit 0
+          fi
+          git config user.name "shivinhazen"
+          git config user.email "140849413+shivinhazen@users.noreply.github.com"
+          git add public/capital-consultoria-logo.jpg
+          git commit -m "assets: vendor Capital Consultoria logo"
+          git push
