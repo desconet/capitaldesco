@@ -1,6 +1,5 @@
 /* eslint-disable prettier/prettier -- preserve Lovable-generated route formatting; avoid a whole-file cosmetic diff */
 import { createFileRoute } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Building2, CheckCircle2, FileDown, Info, Loader2, Plus, RefreshCw, Search, School, Trash2 } from "lucide-react";
 
@@ -58,7 +57,6 @@ function Index() {
   const [erroInep, setErroInep] = useState("");
   const [buscandoEscola, setBuscandoEscola] = useState(false);
   const [exportando, setExportando] = useState(false);
-  const consultarEscola = useServerFn(consultarEscolaPorInep);
 
   useEffect(() => { setDataCadastro(new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })); }, []);
   useEffect(() => { buscarUfs().then(setUfs).catch(() => setUfs([])).finally(() => setCarregandoLocalidades(false)); }, []);
@@ -78,7 +76,7 @@ function Index() {
     if (!/^\d{8}$/.test(inep)) { setErroInep("Informe os 8 números do código INEP."); return; }
     setBuscandoEscola(true);
     try {
-      const resultado = await consultarEscola({ data: { inep } });
+      const resultado = await consultarEscolaPorInep(inep);
       if (!resultado) setErroInep("Código ainda não encontrado na base. O cálculo pode continuar normalmente.");
       else setEscola(resultado);
     } catch { setErroInep("Não foi possível consultar a escola agora. O cálculo pode continuar normalmente."); }
