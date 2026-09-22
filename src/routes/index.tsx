@@ -118,15 +118,20 @@ function Index() {
     else if (dataPosteriorAoCadastro(t.dataInicio)) erros.push(`Turma ${i + 1}: a data de início não pode ser posterior ao registro/envio no Simec.`);
     else if (dataCadastroValida && mesesDeFuncionamento(t.dataInicio, dataCadastro) <= 0) erros.push(`Turma ${i + 1}: o prazo máximo de 18 meses já terminou.`);
     if (!t.regular) erros.push(`Turma ${i + 1}: marque Regular, pois os alunos especiais fazem parte do total regular.`);
-    if (t.regular && t.alunosRegulares <= 0) erros.push(`Turma ${i + 1}: informe a quantidade de alunos regulares.`);\n    else if (t.regular && !Number.isInteger(t.alunosRegulares)) erros.push(`Turma ${i + 1}: a quantidade de alunos deve ser um número inteiro.`);
-    if (t.especial && t.alunosEspeciais <= 0) erros.push(`Turma ${i + 1}: informe a quantidade de alunos especiais.`);\n    else if (t.especial && !Number.isInteger(t.alunosEspeciais)) erros.push(`Turma ${i + 1}: a quantidade de alunos especiais deve ser um número inteiro.`);
+    if (t.regular && t.alunosRegulares <= 0) erros.push(`Turma ${i + 1}: informe a quantidade de alunos regulares.`);
+    else if (t.regular && !Number.isInteger(t.alunosRegulares)) erros.push(`Turma ${i + 1}: a quantidade de alunos deve ser um número inteiro.`);
+    if (t.especial && t.alunosEspeciais <= 0) erros.push(`Turma ${i + 1}: informe a quantidade de alunos especiais.`);
+    else if (t.especial && !Number.isInteger(t.alunosEspeciais)) erros.push(`Turma ${i + 1}: a quantidade de alunos especiais deve ser um número inteiro.`);
     if (t.especial && t.alunosEspeciais > t.alunosRegulares) erros.push(`Turma ${i + 1}: alunos especiais não podem superar o total de alunos regulares.`);
     return erros;
   });
   const errosQuantidadesEstabelecimento = paresEstabelecimento.flatMap(({ regular, especial }) => {
     const total = quantidades[regular.chave] ?? 0;
     const especiais = especial ? quantidades[especial.chave] ?? 0 : 0;
-    const erros: string[] = [];\n    if (!Number.isInteger(total) || !Number.isInteger(especiais)) erros.push(`${regular.etapa} ${regular.turno}: as quantidades de alunos devem ser números inteiros.`);\n    if (especiais > total) erros.push(`${regular.etapa} ${regular.turno}: alunos especiais não podem superar o total regular.`);\n    return erros;
+    const erros: string[] = [];
+    if (!Number.isInteger(total) || !Number.isInteger(especiais)) erros.push(`${regular.etapa} ${regular.turno}: as quantidades de alunos devem ser números inteiros.`);
+    if (especiais > total) erros.push(`${regular.etapa} ${regular.turno}: alunos especiais não podem superar o total regular.`);
+    return erros;
   });
   const errosEstabelecimento = [!dataInicioEstabelecimento ? "Informe a data de início do estabelecimento." : "", dataPosteriorAoCadastro(dataInicioEstabelecimento) ? "A data de início do estabelecimento não pode ser posterior ao registro/envio no Simec." : "", dataInicioEstabelecimento && dataCadastroValida && !dataPosteriorAoCadastro(dataInicioEstabelecimento) && mesesDeFuncionamento(dataInicioEstabelecimento, dataCadastro) <= 0 ? "O prazo máximo de 18 meses do estabelecimento já terminou." : "", paresEstabelecimento.every(({ regular }) => (quantidades[regular.chave] ?? 0) <= 0) ? "Informe ao menos uma matrícula regular." : "", ...errosQuantidadesEstabelecimento].filter(Boolean);
   const avisos = [...errosGerais, ...(modo === "turmas" ? errosTurmas : errosEstabelecimento)];
