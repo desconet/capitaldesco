@@ -7,7 +7,7 @@ const target = process.env.TARGET_URL;
 if (!target) throw new Error("TARGET_URL is required");
 
 const browser = await chromium.launch({ headless: true });
-const context = await browser.new_context({ accept_downloads: true });
+const context = await browser.newContext({ acceptDownloads: true });
 
 async function mockIbge(page) {
   await page.route("https://servicodados.ibge.gov.br/api/v1/localidades/**", async (route) => {
@@ -46,16 +46,20 @@ async function pageReady(page) {
   await mockIbge(page);
   const response = await page.goto(target, { waitUntil: "networkidle", timeout: 60000 });
   assert.equal(response?.status(), 200);
-  await page.get_by_role("heading", { name: "Calculadora de Repasse FNDE" }).wait_for();
-  await page.get_by_label("Estado (UF)*").wait_for();
+  await page.getByRole("heading", { name: "Calculadora de Repasse FNDE" }).waitFor();
+  await page.waitForFunction(() => {
+    const select = [...document.querySelectorAll("select")].find((el) =>
+      el.closest("label")?.textContent?.includes("Estado (UF)"),
+    );
+    return select && select.querySelectorAll("option").length > 1;
+  });
   return errors;
 }
 
 async function fillLocation(page, uf, municipio) {
-  await page.get_by_label("Estado (UF)*").select_option(uf);
-  const municipioSelect = page.get_by_label("Município*");
-  await municipioSelect.wait_for({ state: "visible" });
-  await page.wait_for_function(
+  await page.getByLabel(/Estado \(UF\)/).selectOption(uf);
+  const municipioSelect = page.getByLabel(/Município/);
+  await page.waitForFunction(
     () => {
       const select = [...document.querySelectorAll("select")].find((el) =>
         el.closest("label")?.textContent?.includes("Município"),
@@ -65,7 +69,7 @@ async function fillLocation(page, uf, municipio) {
     null,
     { timeout: 10000 },
   );
-  await municipioSelect.select_option({ label: municipio });
+  await municipioSelect.selectOption({ label: municipio });
 }
 
 async function setEstablishmentQuantity(page, rowText, value) {
@@ -74,84 +78,87 @@ async function setEstablishmentQuantity(page, rowText, value) {
 }
 
 async function simplcioMendes() {
-  const page = await context.new_page();
+  const page = await context.newPage();
   const errors = await pageReady(page);
 
-  await page.get_by_role("button", { name: "Novos Estabelecimentos" }).click();
+  await page.getByRole("button", { name: "Novos Estabelecimentos" }).click();
   await fillLocation(page, "PI", "Simplício Mendes");
-  await page.get_by_label("Data de registro/envio no Simec*").fill("2026-07-22");
-  await page.get_by_label("Data de início*").fill("2026-05-29");
+  await page.getByLabel(/Data de registro\/envio no Simec/).fill("2026-07-22");
+  await page.getByLabel("Data de início", { exact: true }).fill("2026-05-29");
 
   await setEstablishmentQuantity(page, "Regular · Creche Parcial", 64);
   await setEstablishmentQuantity(page, "Regular · Pré-escola Parcial", 4);
 
-  await page.get_by_text("R$ 722.928,00", { exact: true }).wait_for({ timeout: 10000 });
-  await page.get_by_text("FUNDEB · 2025", { exact: true }).wait_for();
-  assert.equal(await page.get_by_label("VAAF Base do FUNDEB (R$)*").input_value(), "5696.84");
+  await page.getByText("R$ 722.928,00", { exact: true }).first().waitFor({ timeout: 10000 });
+  await page.getByText("FUNDEB · 2025", { exact: true }).waitFor();
+  assert.equal(await page.getByLabel(/VAAF Base do FUNDEB/).inputValue(), "5696.84");
 
   const specialRows = page.locator("tbody tr").filter({ hasText: "Educação Especial" });
   assert.equal(await specialRows.count(), 0);
 
-  const downloadPromise = page.wait_for_event("download", { timeout: 30000 });
-  await page.get_by_role("button", { name: "Exportar PDF" }).click();
+  const downloadPromise = page.waitForEvent("download", { timeout: 30000 });
+  await page.getByRole("button", { name: "Exportar PDF" }).click();
   const download = await downloadPromise;
   const path = await download.path();
   assert.ok(path);
   assert.ok((await fs.promises.stat(path)).size > 1000);
-  assert.match(download.suggested_filename(), /\.pdf$/i);
+  assert.match(download.suggestedFilename(), /\.pdf$/i);
 
   assert.deepEqual(errors, []);
   await page.close();
 }
 
 async function vicentinopolis() {
-  const page = await context.new_page();
+  const page = await context.newPage();
   const errors = await pageReady(page);
 
-  await page.get_by_role("button", { name: "Novos Estabelecimentos" }).click();
+  await page.getByRole("button", { name: "Novos Estabelecimentos" }).click();
   await fillLocation(page, "GO", "Vicentinópolis");
-  await page.get_by_label("Data de registro/envio no Simec*").fill("2026-05-07");
-  await page.get_by_label("Data de início*").fill("2025-09-26");
+  await page.getByLabel(/Data de registro\/envio no Simec/).fill("2026-05-07");
+  await page.getByLabel("Data de início", { exact: true }).fill("2025-09-26");
 
   await setEstablishmentQuantity(page, "Regular · Pré-escola Parcial", 34);
 
-  await page.get_by_text("R$ 147.248,33", { exact: true }).wait_for({ timeout: 10000 });
-  await page.get_by_text("FUNDEB · 2024", { exact: true }).wait_for();
-  assert.equal(await page.get_by_label("VAAF Base do FUNDEB (R$)*").input_value(), "5648.91");
+  await page.getByText("R$ 147.248,33", { exact: true }).first().waitFor({ timeout: 10000 });
+  await page.getByText("FUNDEB · 2024", { exact: true }).waitFor();
+  assert.equal(await page.getByLabel(/VAAF Base do FUNDEB/).inputValue(), "5648.91");
 
   assert.deepEqual(errors, []);
   await page.close();
 }
 
 async function specialSubsetAndValidation() {
-  const page = await context.new_page();
+  const page = await context.newPage();
   const errors = await pageReady(page);
 
   await fillLocation(page, "PI", "Simplício Mendes");
-  await page.get_by_label("Data de registro/envio no Simec*").fill("2026-06-15");
-  await page.get_by_label("Data de início*").fill("2026-06-01");
+  await page.getByLabel(/Data de registro\/envio no Simec/).fill("2026-06-15");
+  await page.getByLabel("Data de início", { exact: true }).fill("2026-06-01");
+  await page.getByLabel("Turno").selectOption("Parcial");
 
-  await page.get_by_label("Quantidade de alunos regular").fill("20");
-  await page.get_by_text("R$ 226.141,50", { exact: true }).wait_for({ timeout: 10000 });
+  await page.getByLabel("Quantidade de alunos regular").fill("20");
+  await page.getByText("R$ 226.141,50", { exact: true }).first().waitFor({ timeout: 10000 });
 
-  await page.get_by_role("checkbox", { name: "Especial" }).click();
-  await page.get_by_label("Quantidade de alunos especial").fill("3");
-  await page.get_by_text("R$ 226.141,50", { exact: true }).wait_for({ timeout: 10000 });
+  await page.getByRole("checkbox", { name: "Especial" }).click();
+  await page.getByLabel("Quantidade de alunos especial").fill("3");
+  await page.getByText("R$ 226.141,50", { exact: true }).first().waitFor({ timeout: 10000 });
   assert.equal(await page.locator("tbody tr").filter({ hasText: "Educação Especial" }).count(), 0);
 
-  await page.get_by_label("Quantidade de alunos regular").fill("1.5");
-  await page.get_by_text(/número inteiro/).wait_for();
-  await page.get_by_text("Aguardando dados", { exact: true }).wait_for();
+  await page.getByLabel("Quantidade de alunos regular").fill("1.5");
+  await page.getByText(/número inteiro/).first().waitFor();
+  await page.getByText("Aguardando dados", { exact: true }).waitFor();
 
   assert.deepEqual(errors, []);
   await page.close();
 }
 
 async function mobileLayout() {
-  const page = await context.new_page();
-  await page.set_viewport_size({ width: 390, height: 844 });
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 390, height: 844 });
   const errors = await pageReady(page);
-  const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  const overflows = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth + 1,
+  );
   assert.equal(overflows, false);
   assert.deepEqual(errors, []);
   await page.close();
