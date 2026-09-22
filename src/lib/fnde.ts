@@ -241,7 +241,7 @@ export function calcularRepassePrograma(args: {
   repasse: number;
 } | null {
   const parametros = obterParametrosFundeb(args.programa, args.dataInicio, args.dataRegistroSimec);
-  if (!parametros) return null;
+  if (!parametros || !Number.isInteger(args.alunos) || args.alunos <= 0) return null;
   const meses = mesesDeFuncionamento(args.dataInicio, args.dataRegistroSimec);
   const fator = calcularFator(args.etapa, args.turno, "Regular", parametros.anoBase);
   const valorUnitario = valorAlunoAno(
