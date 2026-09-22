@@ -56,7 +56,7 @@ function Index() {
   const [escola, setEscola] = useState<EscolaInep | null>(null);
   const [erroInep, setErroInep] = useState("");
   const [buscandoEscola, setBuscandoEscola] = useState(false);
-  const [exportando, setExportando] = useState(false);
+  const [exportando, setExportando] = useState(false);\n  const [erroPdf, setErroPdf] = useState("");
 
   useEffect(() => { setDataCadastro(new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })); }, []);
   useEffect(() => { buscarUfs().then(setUfs).catch(() => setUfs([])).finally(() => setCarregandoLocalidades(false)); }, []);
@@ -164,31 +164,109 @@ function Index() {
 
   async function exportarPdf() {
     if (!dadosValidos) return;
+    setErroPdf("");
     setExportando(true);
     try {
-      const [{ jsPDF }, autoTableModule, fonte, logo] = await Promise.all([import("jspdf"), import("jspdf-autotable"), fetch(pdfFontUrl).then((r) => r.arrayBuffer()), fetch(capitalLogo.url).then((r) => r.arrayBuffer())]);
-      const doc = new jsPDF(); let binario = ""; const bytes = new Uint8Array(fonte);
-      for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-      doc.addFileToVFS("DejaVuSans.ttf", btoa(binario)); doc.addFont("DejaVuSans.ttf", "DejaVuSans", "normal"); doc.setFont("DejaVuSans");
+      const [{ jsPDF }, autoTableModule] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+
+      let fonte: ArrayBuffer | null = null;
+      try {
+        const respostaFonte = await fetch(pdfFontUrl);
+        if (respostaFonte.ok) fonte = await respostaFonte.arrayBuffer();
+      } catch {
+        fonte = null;
+      }
+
+      let logo: ArrayBuffer | null = null;
+      try {
+        const respostaLogo = await fetch(capitalLogo.url);
+        if (respostaLogo.ok) logo = await respostaLogo.arrayBuffer();
+      } catch {
+        logo = null;
+      }
+
+      const doc = new jsPDF();
+      let fontePdf = "helvetica";
+
+      if (fonte) {
+        let binario = "";
+        const bytes = new Uint8Array(fonte);
+        for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        doc.addFileToVFS("DejaVuSans.ttf", btoa(binario));
+        doc.addFont("DejaVuSans.ttf", "DejaVuSans", "normal");
+        doc.setFont("DejaVuSans");
+        fontePdf = "DejaVuSans";
+      }
+
       const tituloRelatorio = modo === "turmas" ? "Relatório Novas Turmas" : "Relatório Novos Estabelecimentos";
-      doc.setFillColor(28, 75, 145); doc.rect(0, 0, 210, 34, "F"); doc.setFillColor(255, 255, 255); doc.roundedRect(10, 5, 56, 23, 1.5, 1.5, "F"); doc.addImage(new Uint8Array(logo), "JPEG", 12, 8, 52, 16.6);
-      doc.setTextColor(255, 255, 255); doc.setFontSize(15); doc.text(tituloRelatorio, 72, 16);
-      doc.setFontSize(9); doc.text("Programa de Repasse FNDE", 72, 24); doc.setTextColor(25, 34, 53); doc.setFontSize(10);
-      doc.text(`Município: ${municipio} / ${uf}`, 14, 44); doc.text(`VAAF base: ${brl(vaaf)}`, 14, 51); doc.text(`Fonte: ${fonteVaaf}`, 14, 58, { maxWidth: 182 });
+      doc.setFillColor(28, 75, 145);
+      doc.rect(0, 0, 210, 34, "F");
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(10, 5, 56, 23, 1.5, 1.5, "F");
+
+      if (logo) {
+        try {
+          doc.addImage(new Uint8Array(logo), "JPEG", 12, 8, 52, 16.6);
+        } catch {
+          doc.setTextColor(28, 75, 145);
+          doc.setFontSize(10);
+          doc.text("Capital Consultoria", 38, 18, { align: "center" });
+        }
+      } else {
+        doc.setTextColor(28, 75, 145);
+        doc.setFontSize(10);
+        doc.text("Capital Consultoria", 38, 18, { align: "center" });
+      }
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(15);
+      doc.text(tituloRelatorio, 72, 16);
+      doc.setFontSize(9);
+      doc.text("Programa de Repasse FNDE", 72, 24);
+      doc.setTextColor(25, 34, 53);
+      doc.setFontSize(10);
+      doc.text(`Município: ${municipio} / ${uf}`, 14, 44);
+      doc.text(`VAAF base: ${brl(vaaf)}`, 14, 51);
+      doc.text(`Fonte: ${fonteVaaf}`, 14, 58, { maxWidth: 182 });
+
       let inicioTabela = 68;
-       doc.text(`Registro/envio no Simec: ${formatarData(dataCadastro)}`, 14, 65);
-       inicioTabela = 74;
-        if (modo === "estabelecimentos") { doc.text(escola ? `Escola: ${escola.nome} · INEP ${inep}` : `INEP: ${inep || "não informado / aguardando cadastro"}`, 14, 72, { maxWidth: 182 }); doc.text(`Início: ${formatarData(dataInicioEstabelecimento)} · Meses considerados: ${mesesEstabelecimento}`, 14, 79); inicioTabela = 87; }
-       const linhas = resultados.map((r) => [`${r.etapa} / ${r.turno}`, r.modalidade === "Educação Especial" ? "Especial" : "Regular", formatarData(r.dataInicio), String(r.meses), fatorFmt(r.fator), String(r.alunos), brl(r.valorAnual), brl(r.repasse)]);
-       autoTableModule.default(doc, { startY: inicioTabela, head: [["Etapa / Turno", "Modalidade", "Início", "Meses", "Fator", "Alunos", "Valor anual", "Repasse"]], body: linhas, foot: [["TOTAL", "", "", "", "", String(totalAlunos), brl(totalAnual), brl(totalRepasse)]], styles: { font: "DejaVuSans", fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [28, 75, 145] }, footStyles: { fillColor: [230, 238, 249], textColor: [25, 34, 53], fontStyle: "bold" } });
-      const finalY = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 100; doc.setFontSize(8); doc.setTextColor(90, 99, 116); doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")} · Valores estimativos sujeitos à validação pelo FNDE.`, 14, finalY + 10);
+      doc.text(`Registro/envio no Simec: ${formatarData(dataCadastro)}`, 14, 65);
+      inicioTabela = 74;
+
+      if (modo === "estabelecimentos") {
+        doc.text(escola ? `Escola: ${escola.nome} · INEP ${inep}` : `INEP: ${inep || "não informado / aguardando cadastro"}`, 14, 72, { maxWidth: 182 });
+        doc.text(`Início: ${formatarData(dataInicioEstabelecimento)} · Meses considerados: ${mesesEstabelecimento}`, 14, 79);
+        inicioTabela = 87;
+      }
+
+      const linhas = resultados.map((r) => [`${r.etapa} / ${r.turno}`, r.modalidade === "Educação Especial" ? "Especial" : "Regular", formatarData(r.dataInicio), String(r.meses), fatorFmt(r.fator), String(r.alunos), brl(r.valorAnual), brl(r.repasse)]);
+      autoTableModule.default(doc, {
+        startY: inicioTabela,
+        head: [["Etapa / Turno", "Modalidade", "Início", "Meses", "Fator", "Alunos", "Valor anual", "Repasse"]],
+        body: linhas,
+        foot: [["TOTAL", "", "", "", "", String(totalAlunos), brl(totalAnual), brl(totalRepasse)]],
+        styles: { font: fontePdf, fontSize: 7, cellPadding: 2 },
+        headStyles: { fillColor: [28, 75, 145] },
+        footStyles: { fillColor: [230, 238, 249], textColor: [25, 34, 53], fontStyle: "bold" },
+      });
+
+      const finalY = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 100;
+      doc.setFontSize(8);
+      doc.setTextColor(90, 99, 116);
+      doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")} · Valores estimativos sujeitos à validação pelo FNDE.`, 14, finalY + 10);
+
       const tipoArquivo = modo === "turmas" ? "novas-turmas" : "novos-estabelecimentos";
       doc.save(`relatorio-${tipoArquivo}-${municipio.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-")}.pdf`);
-    } finally { setExportando(false); }
+    } catch (erro) {
+      console.error("Falha ao exportar PDF", erro);
+      setErroPdf("Não foi possível gerar o PDF. Tente novamente.");
+    } finally {
+      setExportando(false);
+    }
   }
 
   return <main className="bg-civic-mesh min-h-screen text-ink"><div className="mx-auto max-w-7xl px-4 py-5 sm:px-7 sm:py-8">
-    <header className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="grid size-11 place-items-center rounded-md bg-brand font-display font-bold text-primary-foreground shadow-sm">FDE</div><div><h1 className="font-display text-lg font-bold">Calculadora de Repasse FNDE</h1><p className="text-xs text-ink/55">Novas Turmas e Novos Estabelecimentos</p></div></div><div className="flex items-center gap-2"><span className="hidden rounded-full border border-special/25 bg-background/80 px-3 py-2 text-xs font-semibold text-special sm:inline">FUNDEB · {anoBaseAtual}</span><Button onClick={exportarPdf} disabled={exportando || !dadosValidos || resultados.length === 0} className="bg-brand text-primary-foreground hover:bg-brand-deep">{exportando ? <Loader2 className="animate-spin" /> : <FileDown />} Exportar PDF</Button></div></header>
+    <header className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="grid size-11 place-items-center rounded-md bg-brand font-display font-bold text-primary-foreground shadow-sm">FDE</div><div><h1 className="font-display text-lg font-bold">Calculadora de Repasse FNDE</h1><p className="text-xs text-ink/55">Novas Turmas e Novos Estabelecimentos</p></div></div><div className="flex flex-col items-end gap-1"><div className="flex items-center gap-2"><span className="hidden rounded-full border border-special/25 bg-background/80 px-3 py-2 text-xs font-semibold text-special sm:inline">FUNDEB · {anoBaseAtual}</span><Button onClick={exportarPdf} disabled={exportando || !dadosValidos || resultados.length === 0} className="bg-brand text-primary-foreground hover:bg-brand-deep">{exportando ? <Loader2 className="animate-spin" /> : <FileDown />} Exportar PDF</Button></div>{erroPdf ? <span role="alert" className="text-xs font-medium text-destructive">{erroPdf}</span> : null}</div></header>
     <nav className="mt-7 grid max-w-xl grid-cols-1 rounded-lg border border-ink/10 bg-background/75 p-1 shadow-sm sm:grid-cols-2" aria-label="Tipo de cálculo"><Button variant="ghost" onClick={() => setModo("turmas")} className={modo === "turmas" ? "bg-brand text-primary-foreground hover:bg-brand hover:text-primary-foreground" : "text-ink/60"}><School /> Novas Turmas</Button><Button variant="ghost" onClick={() => setModo("estabelecimentos")} className={modo === "estabelecimentos" ? "bg-brand text-primary-foreground hover:bg-brand hover:text-primary-foreground" : "text-ink/60"}><Building2 /> Novos Estabelecimentos</Button></nav>
 
     <section className="mt-5 border-y border-ink/8 bg-background/75 px-4 py-5 shadow-sm sm:px-6"><SectionTitle numero="1" titulo="Localidade, registro e valor de referência" /><div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
