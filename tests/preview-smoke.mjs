@@ -5,6 +5,8 @@ import fs from "node:fs";
 
 const target = process.env.TARGET_URL;
 if (!target) throw new Error("TARGET_URL is required");
+const targetUrl = new URL(target);
+if (targetUrl.protocol !== "https:") throw new Error("TARGET_URL must use HTTPS");
 
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ acceptDownloads: true });
