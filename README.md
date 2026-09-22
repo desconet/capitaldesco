@@ -71,6 +71,8 @@ bun run build
 
 O mesmo gate roda no GitHub Actions.
 
+Para validação de um deploy real no navegador, existe também o workflow manual `preview-smoke`. Ele recebe uma URL temporária de preview e executa Chromium contra os dois golden cases, PDF, matrículas especiais, validação de inteiros e viewport móvel.
+
 ## Fonte de verdade do cálculo
 
 A ordem de autoridade é:
