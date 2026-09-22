@@ -1,11 +1,3 @@
-import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
-import { z } from "zod";
-
-const consultaEscolaSchema = z.object({
-  inep: z.string().regex(/^\d{8}$/, "O código INEP deve ter exatamente 8 números."),
-});
-
 type RegistroEscola = [nome: string, municipio: string, uf: string, situacao: string];
 
 export interface EscolaInep {
@@ -23,24 +15,53 @@ const situacoes: Record<string, EscolaInep["situacao"]> = {
   "3": "Extinta",
 };
 
-export const consultarEscolaPorInep = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) => consultaEscolaSchema.parse(input))
-  .handler(async ({ data }): Promise<EscolaInep | null> => {
-    const request = getRequest();
-    const origem = new URL(request.url).origin;
-    const resposta = await fetch(`${origem}/data/escolas-inep/${data.inep.slice(0, 2)}.json`, {
-      signal: AbortSignal.timeout(5000),
+const cacheBases = new Map<string, Promise<Record<string, RegistroEscola>>>();
+
+async function carregarBase(prefixo: string): Promise<Record<string, RegistroEscola>> {
+  const emCache = cacheBases.get(prefixo);
+  if (emCache) return emCache;
+
+  const carregamento = fetch(`/data/escolas-inep/${encodeURIComponent(prefixo)}.json`, {
+    cache: "force-cache",
+  })
+    .then(async (resposta) => {
+      if (!resposta.ok) {
+        throw new Error("A base oficial de escolas está indisponível no momento.");
+      }
+      return (await resposta.json()) as Record<string, RegistroEscola>;
+    })
+    .catch((erro) => {
+      cacheBases.delete(prefixo);
+      throw erro;
     });
-    if (!resposta.ok) throw new Error("A base oficial de escolas está indisponível no momento.");
-    const registros = (await resposta.json()) as Record<string, RegistroEscola>;
-    const escola = registros[data.inep];
-    if (!escola) return null;
-    return {
-      inep: data.inep,
-      nome: escola[0],
-      municipio: escola[1],
-      uf: escola[2],
-      situacao: situacoes[escola[3]] ?? "Não informada",
-      fonte: "Censo Escolar 2024 — INEP",
-    };
-  });
+
+  cacheBases.set(prefixo, carregamento);
+  return carregamento;
+}
+
+/**
+ * Consulta a base INEP estática no próprio navegador.
+ *
+ * A versão anterior fazia um Server Function buscar o próprio domínio por HTTP.
+ * Em previews protegidos (como Vercel) essa chamada podia cair no SSO e falhar,
+ * embora o arquivo estivesse disponível para o usuário autenticado. O lookup
+ * direto também permite reutilizar o shard por UF/prefixo durante a sessão.
+ */
+export async function consultarEscolaPorInep(inep: string): Promise<EscolaInep | null> {
+  if (!/^\d{8}$/.test(inep)) {
+    throw new Error("O código INEP deve ter exatamente 8 números.");
+  }
+
+  const registros = await carregarBase(inep.slice(0, 2));
+  const escola = registros[inep];
+  if (!escola) return null;
+
+  return {
+    inep,
+    nome: escola[0],
+    municipio: escola[1],
+    uf: escola[2],
+    situacao: situacoes[escola[3]] ?? "Não informada",
+    fonte: "Censo Escolar 2024 — INEP",
+  };
+}
