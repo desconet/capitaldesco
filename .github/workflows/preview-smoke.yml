@@ -1,29 +1,22 @@
 name: preview-smoke
 
 on:
-  push:
-    branches:
-      - "fix/fnde-calculation-hardening"
   workflow_dispatch:
     inputs:
       target_url:
-        description: "Vercel preview URL"
+        description: "Public or temporary Vercel preview URL (visible in Actions logs)"
         required: true
         type: string
 
 permissions:
   contents: read
 
-concurrency:
-  group: preview-smoke-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      TARGET_URL: ${{ github.event.inputs.target_url || 'https://capitaldesco-preview-51hgh89in-shivinhazens-projects.vercel.app/?_vercel_share=SbZhK8T7UqeQB8tYs6SlT8SZeikPAarM' }}
+      TARGET_URL: ${{ inputs.target_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
