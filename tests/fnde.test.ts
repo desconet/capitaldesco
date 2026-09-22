@@ -240,3 +240,15 @@ test("NaN e infinito não contaminam o total financeiro", () => {
     repasse: 0,
   });
 });
+
+test("matrículas fracionárias são recusadas pelo motor de programa", () => {
+  const linha = calcularRepassePrograma({
+    programa: "turmas",
+    dataInicio: "2026-06-01",
+    dataRegistroSimec: "2026-06-15",
+    etapa: "Creche",
+    turno: "Parcial",
+    alunos: 1.5,
+  });
+  assert.equal(linha, null);
+});
