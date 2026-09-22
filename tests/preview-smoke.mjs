@@ -161,6 +161,24 @@ async function specialSubsetAndValidation() {
   await page.close();
 }
 
+async function inepLookup() {
+  const page = await context.newPage();
+  const errors = await pageReady(page);
+
+  await page.getByRole("button", { name: "Novos Estabelecimentos" }).click();
+  await page.getByRole("heading", { name: "Identificação e matrículas do estabelecimento" }).waitFor();
+  await fillLocation(page, "PI", "Oeiras");
+
+  const inepField = page.locator("label").filter({ hasText: "Código INEP" }).first();
+  await inepField.locator("input").fill("22145796");
+  await page.getByTitle("Consultar escola").click();
+
+  await page.getByText("CMEI ALINA NUNES -CENTRO MUNICIPAL DE EDUCACAO INFANTIL", { exact: true }).waitFor({ timeout: 10000 });
+  await page.getByText("Oeiras/PI", { exact: false }).waitFor();
+  assert.deepEqual(errors, []);
+  await page.close();
+}
+
 async function mobileLayout() {
   const page = await context.newPage();
   await page.setViewportSize({ width: 390, height: 844 });
@@ -177,6 +195,7 @@ try {
   await simplcioMendes();
   await vicentinopolis();
   await specialSubsetAndValidation();
+  await inepLookup();
   await mobileLayout();
   console.log("PREVIEW_SMOKE_PASS");
 } finally {
