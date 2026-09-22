@@ -75,6 +75,14 @@ O projeto mantém snapshots explícitos, não scraping em tempo de execução.
 | 2025 | R$ 5.696,84 | R$ 8.830,09 | R$ 7.121,04 | R$ 8.545,25 | R$ 6.551,36 | Portaria 11/2025 |
 | 2026 | R$ 6.030,44 | R$ 9.347,19 | R$ 7.538,05 | R$ 9.045,67 | R$ 6.935,01 | Portaria 11/2026, publicada em 01/09/2026 |
 
+### Nota específica sobre o snapshot 2025
+
+Existe publicação posterior no exercício de 2025: a Portaria Interministerial MEC/MF nº 13, de 29/12/2025. Ela não foi usada automaticamente para substituir o snapshot 2025 deste projeto.
+
+Motivo: o caso real de Simplício Mendes/PI, calculado pelo próprio FNDE em 2026 e usado como golden case, reproduz exatamente os valores da Portaria nº 11/2025 (por exemplo, Creche Parcial R$ 7.121,04 e Pré-escola Parcial R$ 6.551,36). Até existir evidência oficial de que o programa deve recalcular esse caso com outro snapshot, o comportamento verificado do FNDE prevalece para esta calculadora.
+
+Não “atualizar” 2025 apenas por identificar uma portaria cronologicamente mais nova. Primeiro reconciliar a norma com o comportamento oficial observado e adicionar um caso de regressão correspondente.
+
 ### Política de atualização dentro do ano
 
 O Fundeb pode ter mais de uma publicação no mesmo exercício.
