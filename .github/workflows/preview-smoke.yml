@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      TARGET_URL: ${{ github.event.inputs.target_url || 'https://capitaldesco-preview-51hgh89in-shivinhazens-projects.vercel.app/' }}
+      TARGET_URL: ${{ github.event.inputs.target_url || 'https://capitaldesco-preview-51hgh89in-shivinhazens-projects.vercel.app/?_vercel_share=SbZhK8T7UqeQB8tYs6SlT8SZeikPAarM' }}
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
