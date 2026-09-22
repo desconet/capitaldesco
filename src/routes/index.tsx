@@ -56,7 +56,8 @@ function Index() {
   const [escola, setEscola] = useState<EscolaInep | null>(null);
   const [erroInep, setErroInep] = useState("");
   const [buscandoEscola, setBuscandoEscola] = useState(false);
-  const [exportando, setExportando] = useState(false);\n  const [erroPdf, setErroPdf] = useState("");
+  const [exportando, setExportando] = useState(false);
+  const [erroPdf, setErroPdf] = useState("");
 
   useEffect(() => { setDataCadastro(new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })); }, []);
   useEffect(() => { buscarUfs().then(setUfs).catch(() => setUfs([])).finally(() => setCarregandoLocalidades(false)); }, []);
