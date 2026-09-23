@@ -1,78 +1,124 @@
-# FNDE Repasse Calc
+# CapitalDesco — Calculadora de Repasse FNDE
 
-Crie uma aplicação web responsiva em React (usando Tailwind CSS e shadcn/ui) que funcione como uma "Calculadora de Repasse FNDE - Novas Turmas e Novos Estabelecimentos". O design deve ser limpo, moderno e focado na usabilidade de servidores públicos.
+Aplicação web para simular repasses do FNDE em **Novas Turmas** e **Novos Estabelecimentos**, com parâmetros Fundeb versionados, período elegível, validações e exportação em PDF.
 
-A aplicação deve ser dividida em três seções principais:
+**Aplicação publicada:** https://capitaldesco.lovable.app
 
-1. CONFIGURAÇÕES GERAIS (Inputs):
+> O README original reproduzia o prompt usado para gerar a primeira versão no Lovable. Esse prompt é histórico, não uma especificação normativa. Para cálculo, a fonte de verdade é a documentação oficial do FNDE/Fundeb, complementada por casos reais e testes automatizados.
 
-- Input numérico: "VAAF Base do FUNDEB (R$)" (Valor padrão: 5962.79).
+## Princípios do projeto
 
-- Select dropdown: "Mês de Inauguração" (Opções de Janeiro a Dezembro).
+- **Correção antes de conveniência:** números do FNDE não são inferidos da interface nem de prompts antigos.
+- **Frontend preservado por padrão:** não há objetivo de redesenhar o produto.
+- **Determinismo:** parâmetros nacionais usados no cálculo ficam versionados no repositório.
+- **Fail closed:** exercício sem parâmetro cadastrado bloqueia o cálculo em vez de usar um número silenciosamente incorreto.
+- **Regressão real:** exemplos já calculados pelo FNDE são protegidos por testes centavo a centavo.
+- **Performance útil:** chamadas externas desnecessárias são eliminadas e dados estáveis são reutilizados em cache.
 
-  * Lógica invisível: O mês selecionado determina os "Meses de Funcionamento" no ano (ex: Janeiro = 12, Fevereiro = 11, ..., Dezembro = 1).
+## Stack
 
-2. ADIÇÃO DE MATRÍCULAS APROVADAS (Formulário Dinâmico):
+- TanStack Start
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui / Radix UI
+- Bun
+- jsPDF / jsPDF-AutoTable
 
-Crie um formulário onde o usuário possa adicionar várias "linhas" de turmas. Cada linha deve ter:
+## Estrutura relevante
 
-- Select "Etapa de Ensino": Creche ou Pré-escola.
+~~~text
+src/
+  lib/
+    fnde.ts              # motor de domínio e snapshots Fundeb suportados
+    ibge.ts              # estados/municípios, com cache em memória
+    escola.functions.ts  # consulta local da base INEP
+  routes/
+    index.tsx             # interface e orquestração
 
-- Select "Turno": Integral ou Parcial.
+tests/
+  fnde.test.ts            # regras, limites e golden cases do FNDE
+  ibge.test.ts            # cache e falhas da integração de localidades
 
-- Select "Modalidade": Regular ou Educação Especial.
+docs/
+  fnde-calculation.md     # especificação de cálculo, fontes e limitações
+  ai-development.md       # guia AI-first de desenvolvimento
 
-- Input numérico: "Quantidade de Alunos".
+.github/workflows/
+  quality.yml             # tests + typecheck + lint + build
+~~~
 
-- Botão: "Remover" (para excluir a linha) e um botão "Adicionar Nova Turma" no final da lista.
+## Desenvolvimento
 
-3. LÓGICA DE CÁLCULO E TABELA DE RESULTADOS:
+Bun é o runtime/gerenciador preferencial:
 
-Abaixo do formulário, exiba um Dashboard (Cards) e uma Tabela de Resultados atualizados em tempo real.
+~~~bash
+bun install
+bun run dev
+~~~
 
-Regras Matemáticas:
+### Quality gate
 
-- Fatores de Ponderação padrão:
+Antes de considerar uma alteração pronta:
 
-  * Creche + Integral = 1.40
+~~~bash
+bun run test
+bun run typecheck
+bun run lint
+bun run build
+~~~
 
-  * Creche + Parcial = 1.20
+O mesmo gate roda no GitHub Actions.
 
-  * Pré-escola + Integral = 1.30
+Para validação de um deploy real no navegador, existe também o workflow manual `preview-smoke`. Ele recebe uma URL temporária de preview e executa Chromium contra os dois golden cases, PDF, matrículas especiais, validação de inteiros e viewport móvel.
 
-  * Pré-escola + Parcial = 1.10
+## Fonte de verdade do cálculo
 
-- Se "Modalidade" for "Educação Especial", o fator aplicável deve ser 1.20 (ou o fator da etapa/turno, se este for maior).
+A ordem de autoridade é:
 
-- Valor Anual da Turma = (VAAF Base * Fator de Ponderação) * Quantidade de Alunos.
+1. atos e publicações oficiais do FNDE/Fundeb;
+2. exemplos reais já calculados pelo FNDE;
+3. testes automatizados;
+4. implementação.
 
-- Valor Total do Repasse da Turma = (Valor Anual da Turma / 12) * Meses de Funcionamento.
+A interface e o histórico do Lovable não substituem os itens acima.
 
-Exibição dos Resultados:
+Leia [docs/fnde-calculation.md](docs/fnde-calculation.md) antes de alterar datas, períodos, VAAF, valores aluno/ano, fatores ou matrículas.
 
-- Card em destaque (Destaque visual): "Valor Total do Repasse Previsto (R$)" (Soma do repasse de todas as turmas adicionadas).
+## Casos de regressão já protegidos
 
-- Tabela detalhada listando cada turma adicionada, mostrando: Etapa, Turno, Fator Aplicado, Qtd Alunos, Valor Anual e o Repasse Proporcional (R$). Todos os valores monetários devem ser formatados em Reais (BRL).
+Entre os casos reais:
 
-This project was built with [Lovable](https://lovable.dev).
+- **Simplício Mendes/PI:** R$ 722.928,00;
+- **Vicentinópolis/GO:** R$ 147.248,33.
 
-**Live app**: https://capitaldesco.lovable.app
+Os resultados devem continuar reproduzíveis centavo a centavo.
 
-## Build with Lovable
+## Desenvolvimento com IA
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/79a39957-72d4-4c24-abaa-d8876d7385e7).
+O repositório foi preparado para trabalho AI-first. Um agente novo deve começar por:
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+1. [AGENTS.md](AGENTS.md);
+2. [docs/ai-development.md](docs/ai-development.md);
+3. [docs/fnde-calculation.md](docs/fnde-calculation.md), quando tocar domínio FNDE;
+4. testes existentes da área alterada.
 
-## Development
+A regra é simples: **não inventar regra de negócio para fazer código ou teste passar**.
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+## Git, Lovable e deploy
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+O upstream `desconet/capitaldesco` é o repositório conectado ao Lovable.
+
+- desenvolvimento/revisão pode acontecer em fork e feature branch;
+- o fork não é produção;
+- mudanças aprovadas chegam ao upstream por Pull Request;
+- não faça force-push nem reescreva histórico já sincronizado com o Lovable;
+- antes de abrir/atualizar PR, confirme que o branch está baseado no `main` atual do upstream;
+- merge só depois de todos os gates verdes e revisão do diff.
+
+## Atualização de parâmetros
+
+Não substitua parâmetros históricos por valores de outro exercício.
+
+Para atualizar o Fundeb, adicione/ajuste o snapshot explicitamente, registre a publicação oficial correspondente e acrescente testes. O procedimento e a política de snapshots estão em [docs/fnde-calculation.md](docs/fnde-calculation.md).
